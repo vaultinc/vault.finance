@@ -15,7 +15,7 @@ targets = ['x86_64-unknown-linux-gnu']
 [[bin]]
 name = 'node-template'
 
-[dependencies.node-template-runtime]
+[dependencies.subswap]
 path = '../runtime'
 version = '2.0.0-rc6'
 
