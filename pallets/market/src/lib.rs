@@ -1,6 +1,6 @@
 // This file is part of Substrate.
 
-// Copyright (C) 2017-2020 Parity Technologies (UK) Ltd.
+// Copyright (C) Hyungsuk Kang
 // SPDX-License-Identifier: Apache-2.0
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -85,23 +85,22 @@
 //! ### Simple Code Snippet
 //!
 //! ```rust,ignore
-//! use pallet_assets as assets;
+//! use pallet_market as market;
 //! use frame_support::{decl_module, dispatch, ensure};
 //! use frame_system::ensure_signed;
 //!
-//! pub trait Trait: assets::Trait { }
+//! pub trait Trait: assets::Trait + market::Trait { }
 //!
 //! decl_module! {
 //! 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-//! 		pub fn issue_token_airdrop(origin) -> dispatch::DispatchResult {
+//! 		pub fn issue_liquidity_token(origin, token0: T::AssetId, amount0: T::Balance, token1: T::AssetId, amount1: T::Balance) -> dispatch::DispatchResult {
 //! 			let sender = ensure_signed(origin).map_err(|e| e.as_str())?;
 //!
-//! 			const ACCOUNT_ALICE: u64 = 1;
-//! 			const ACCOUNT_BOB: u64 = 2;
-//! 			const COUNT_AIRDROP_RECIPIENTS: u64 = 2;
-//! 			const TOKENS_FIXED_SUPPLY: u64 = 100;
+//! 			const ACA: u64 = 1;
+//! 			const aUSD: u64 = 2;
 //!
 //! 			ensure!(!COUNT_AIRDROP_RECIPIENTS.is_zero(), "Divide by zero error.");
+//! 			<asset::Module<T>>::
 //!
 //! 			let asset_id = Self::next_asset_id();
 //!
@@ -110,7 +109,7 @@
 //! 			<Balances<T>>::insert((asset_id, &ACCOUNT_BOB), TOKENS_FIXED_SUPPLY / COUNT_AIRDROP_RECIPIENTS);
 //! 			<TotalSupply<T>>::insert(asset_id, TOKENS_FIXED_SUPPLY);
 //!
-//! 			Self::deposit_event(RawEvent::Issued(asset_id, sender, TOKENS_FIXED_SUPPLY));
+//! 			Self::deposit_event(RawEvent::CreatePair(ACA, aUSD, ACA_aUSD_lpt));
 //! 			Ok(())
 //! 		}
 //! 	}
