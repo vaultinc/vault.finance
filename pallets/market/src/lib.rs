@@ -133,6 +133,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use asset;
+mod math;
+use crate::sp_api_hidden_includes_decl_storage::hidden_include::sp_runtime::traits::*;
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
 /// https://substrate.dev/docs/en/knowledgebase/runtime/frame
@@ -144,7 +146,6 @@ mod mock;
 
 #[cfg(test)]
 mod tests;
-
 /// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Trait: frame_system::Trait + asset::Trait {
 	/// Because this pallet emits events, it depends on the runtime's definition of an event.
@@ -165,7 +166,7 @@ decl_storage! {
 		Something get(fn something): Option<u32>;
 		pub Reserves get(fn reserves): map hasher(blake2_128_concat) T::AssetId => (T::Balance, T::Balance);
 		pub Pair get(fn pair): map hasher(blake2_128_concat) T::AssetId => (T::AssetId, T::AssetId);
-		pub LPTokens get(fn lpt): map hasher(blake2_128_concat) (T::AssetId, T::AssetId) => T::AssetId;
+		pub LPTokens get(fn lpt): map hasher(blake2_128_concat) (T::AssetId, T::AssetId) => Option<T::AssetId>;
 	}
 }
 
@@ -241,7 +242,6 @@ decl_module! {
 		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
 		pub fn cause_error(origin) -> dispatch::DispatchResult {
 			let _who = ensure_signed(origin)?;
-
 			// Read a value from storage.
 			match Something::get() {
 				// Return an error if the value has not been set.
@@ -256,10 +256,49 @@ decl_module! {
 			}
 		}
 
+		// Mint liquidity by adding a liquidity in a pair
 		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn create_pair(origin, token0: T::AssetId, token1: T::AssetId) -> dispatch::DispatchResult {
-			let _who = ensure_signed(origin)?;
-			Ok(())
+		pub fn mint_liquidity(origin, token0: T::AssetId, amount0: T::Balance, token1: T::AssetId, amount1: T::Balance) -> dispatch::DispatchResult {
+			let MINIMUM_LIQUIDITY = T::Balance::from(1);
+			let sender = ensure_signed(origin)?;
+			// Check if pair exists
+			// Calculate the lptoken amount
+			match LPTokens::<T>::get((&token0, &token1)) {
+				// create pair if lpt does not exist
+				None => {
+					// Deposit assets to create a pair
+					asset::Module::<T>::burn_from_system(&token0, &sender, &amount0);
+					asset::Module::<T>::burn_from_system(&token1, &sender, &amount1);
+					// Add amounts to the each reserve
+					<Reserves<T>>::insert(&token0, (amount0, amount1));
+					let mut lptoken_amount: T::Balance = math::sqrt::<T>(amount0 * amount1);
+					lptoken_amount = lptoken_amount.checked_sub(&MINIMUM_LIQUIDITY).expect("Integer Underflow");
+					// Issue LPtoken
+					asset::Module::<T>::issue_from_system(T::Balance::from(0));
+					let mut lptoken_id: T::AssetId = asset::NextAssetId::<T>::get();
+					lptoken_id -= One::one();
+					// Mint LPtoken to the sender
+					asset::Module::<T>::mint_from_system(&lptoken_id, &sender, &lptoken_amount)?;
+					Self::deposit_event(RawEvent::CreatePair(token0, token1, lptoken_id));
+					Ok(())
+				},
+				// when lpt exists and total supply is superset of 0
+				Some(lpt) if asset::Module::<T>::total_supply(lpt) > T::Balance::from(0) => {
+					let total_supply = asset::Module::<T>::total_supply(lpt);
+					let reserves = <Reserves<T>>::get(lpt);
+					let left = amount0.checked_mul(&total_supply).expect("Multiplication Overflow").checked_div(&reserves.0).expect("division by zero");
+					let right = amount1.checked_mul(&total_supply).expect("Multiplication Overflow").checked_div(&reserves.1).expect("division by zero");
+					let lptoken_amount = math::min::<T>(left, right);
+					// Mint LPtoken to the sender
+					asset::Module::<T>::mint_from_system(&lpt, &sender, &lptoken_amount)?;
+					Self::deposit_event(RawEvent::CreatePair(token0, token1, lpt));
+					Ok(())
+				},
+				Some(lpt) if asset::Module::<T>::total_supply(lpt) < T::Balance::from(0) => {
+					Err(Error::<T>::InsufficientLiquidityMinted)?
+				},
+				Some(_) => Err(Error::<T>::NoneValue)?,
+			}
 		}
 
 		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
@@ -268,4 +307,8 @@ decl_module! {
 			Ok(())
 		}
 	}
+}
+// The main implementation block for the module.
+impl<T: Trait> Module<T> {
+	pub fn _mintFee(reserve0: T::Balance, reserve1: T::Balance) {}
 }

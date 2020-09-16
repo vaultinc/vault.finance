@@ -133,12 +133,21 @@
 // Ensure we're `no_std` when compiling for Wasm.
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use codec::{Decode, Encode};
 use frame_support::{
 	decl_error, decl_event, decl_module, decl_storage, dispatch, ensure, Parameter,
 };
 use frame_system::ensure_signed;
 use sp_runtime::traits::One;
 use sp_runtime::traits::{AtLeast32Bit, AtLeast32BitUnsigned, Member, StaticLookup, Zero};
+use sp_std::default::Default;
+
+/// Data storage type for each account
+#[derive(Encode, Decode, Clone, Eq, PartialEq)]
+pub enum Account<AccountId> {
+	User(AccountId),
+	System(),
+}
 
 /// The module configuration trait.
 pub trait Trait: frame_system::Trait {
@@ -155,7 +164,6 @@ pub trait Trait: frame_system::Trait {
 decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 		type Error = Error<T>;
-
 		fn deposit_event() = default;
 		/// Issue a new class of fungible assets. There are, and will only ever be, `total`
 		/// such assets and they'll all belong to the `origin` initially. It will have an
@@ -223,7 +231,8 @@ decl_module! {
 		){
 			let origin = ensure_signed(origin)?;
 			let target = T::Lookup::lookup(target)?;
-			ensure!(origin == <Creator<T>>::get(id), Error::<T>::NotTheCreator);
+			let creator = <Creator<T>>::get(id);
+			ensure!(origin == creator, Error::<T>::NotTheCreator);
 			ensure!(!amount.is_zero(), Error::<T>::AmountZero);
 
 			Self::deposit_event(RawEvent::Minted(id, target.clone(), amount));
@@ -305,6 +314,8 @@ decl_error! {
 		NotTheCreator,
 		/// Not the approver for the account
 		NotApproved,
+		/// Created by System
+		CreatedBySystem,
 	}
 }
 
@@ -313,7 +324,7 @@ decl_storage! {
 		/// The number of units of assets held by any given account.
 		Balances: map hasher(blake2_128_concat) (T::AssetId, T::AccountId) => T::Balance;
 		/// The next asset identifier up for grabs.
-		NextAssetId get(fn next_asset_id): T::AssetId;
+		pub NextAssetId get(fn next_asset_id): T::AssetId;
 		/// The total unit supply of an asset.
 		///
 		/// TWOX-NOTE: `AssetId` is trusted, so this is safe.
@@ -325,7 +336,6 @@ decl_storage! {
 // The main implementation block for the module.
 impl<T: Trait> Module<T> {
 	// Public immutables
-
 	/// Get the asset `id` balance of `who`.
 	pub fn balance(id: T::AssetId, who: T::AccountId) -> T::Balance {
 		<Balances<T>>::get((id, who))
@@ -337,26 +347,35 @@ impl<T: Trait> Module<T> {
 	}
 
 	pub fn mint_from_system(
-		id: T::AssetId,
-		target: <T::Lookup as StaticLookup>::Source,
-		amount: T::Balance,
+		id: &T::AssetId,
+		target: &T::AccountId,
+		amount: &T::Balance,
 	) -> dispatch::DispatchResult {
-		let target = T::Lookup::lookup(target)?;
 		ensure!(!amount.is_zero(), Error::<T>::AmountZero);
-		Self::deposit_event(RawEvent::Minted(id, target.clone(), amount));
-		<Balances<T>>::mutate((id, target), |balance| *balance += amount);
+		Self::deposit_event(RawEvent::Minted(*id, target.clone(), *amount));
+		<Balances<T>>::mutate((*id, target), |balance| *balance += *amount);
 		Ok(())
 	}
 
 	pub fn burn_from_system(
-		id: T::AssetId,
-		target: <T::Lookup as StaticLookup>::Source,
-		amount: T::Balance,
+		id: &T::AssetId,
+		target: &T::AccountId,
+		amount: &T::Balance,
 	) -> dispatch::DispatchResult {
-		let target = T::Lookup::lookup(target)?;
 		ensure!(!amount.is_zero(), Error::<T>::AmountZero);
-		Self::deposit_event(RawEvent::Burned(id, target.clone(), amount));
-		<Balances<T>>::mutate((id, target), |balance| *balance -= amount);
+		Self::deposit_event(RawEvent::Burned(*id, target.clone(), *amount));
+		<Balances<T>>::mutate((*id, target), |balance| *balance -= *amount);
 		Ok(())
+	}
+
+	pub fn issue_from_system(total: T::Balance) {
+		let id = Self::next_asset_id();
+		<NextAssetId<T>>::mutate(|id| *id += One::one());
+
+		<Balances<T>>::insert((id, &T::AccountId::default()), total);
+		<TotalSupply<T>>::insert(id, total);
+		<Creator<T>>::insert(id, &T::AccountId::default());
+
+		Self::deposit_event(RawEvent::Issued(id, T::AccountId::default(), total));
 	}
 }

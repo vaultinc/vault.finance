@@ -3,16 +3,25 @@ use node_template_runtime::{
 	SystemConfig, WASM_BINARY,
 };
 use sc_service::ChainType;
+use serde_json::json;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{sr25519, Pair, Public};
 use sp_finality_grandpa::AuthorityId as GrandpaId;
 use sp_runtime::traits::{IdentifyAccount, Verify};
-
 // The URL for the telemetry server.
 // const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
 /// Specialized `ChainSpec`. This is a specialization of the general Substrate ChainSpec type.
 pub type ChainSpec = sc_service::GenericChainSpec<GenesisConfig>;
+
+const SUBSWAP_PROPERTIES: &str = r#"
+{
+	"ss58format": 7,
+	"tokenDecimals": 15,
+	"tokenSymbol": "SSWP"	
+"#;
+
+const SUBSWAP_PROTOCOL_ID: &str = "sswp";
 
 /// Generate a crypto pair from seed.
 pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Public {
@@ -38,7 +47,8 @@ pub fn authority_keys_from_seed(s: &str) -> (AuraId, GrandpaId) {
 
 pub fn development_config() -> Result<ChainSpec, String> {
 	let wasm_binary = WASM_BINARY.ok_or("Development wasm binary not available".to_string())?;
-
+	let prop_map: serde_json::map::Map<std::string::String, serde_json::value::Value> =
+		json!(SUBSWAP_PROPERTIES).as_object().unwrap().clone();
 	Ok(ChainSpec::from_genesis(
 		// Name
 		"Subswap",
@@ -67,9 +77,9 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		// Telemetry
 		None,
 		// Protocol ID
-		None,
+		Some(SUBSWAP_PROTOCOL_ID),
 		// Properties
-		None,
+		Some(prop_map),
 		// Extensions
 		None,
 	))
@@ -77,7 +87,8 @@ pub fn development_config() -> Result<ChainSpec, String> {
 
 pub fn local_testnet_config() -> Result<ChainSpec, String> {
 	let wasm_binary = WASM_BINARY.ok_or("Development wasm binary not available".to_string())?;
-
+	let prop_map: serde_json::map::Map<std::string::String, serde_json::value::Value> =
+		json!(SUBSWAP_PROPERTIES).as_object().unwrap().clone();
 	Ok(ChainSpec::from_genesis(
 		// Name
 		"Subswap Local Testnet",
@@ -117,9 +128,9 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		// Telemetry
 		None,
 		// Protocol ID
-		None,
+		Some(SUBSWAP_PROTOCOL_ID),
 		// Properties
-		None,
+		Some(prop_map),
 		// Extensions
 		None,
 	))

@@ -167,7 +167,7 @@ version = '2.0.0-rc6'
 
 [dependencies.asset]
 default-features = false
-package = 'pallet-asset'
+package = 'subswap-asset'
 path = '../pallets/asset'
 version = '2.0.0-rc6'
 
