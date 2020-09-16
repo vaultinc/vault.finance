@@ -3387,36 +3387,37 @@ dependencies = [
 ]
 
 [[package]]
-name = "node-template"
+name = "node-template-runtime"
 version = "2.0.0-rc6"
 dependencies = [
- "jsonrpc-core",
- "pallet-transaction-payment-rpc",
- "sc-basic-authorship",
- "sc-cli",
- "sc-client-api",
- "sc-consensus",
- "sc-consensus-aura",
- "sc-executor",
- "sc-finality-grandpa",
- "sc-rpc",
- "sc-rpc-api",
- "sc-service",
- "sc-transaction-pool",
+ "frame-executive",
+ "frame-support",
+ "frame-system",
+ "frame-system-rpc-runtime-api",
+ "pallet-asset",
+ "pallet-aura",
+ "pallet-balances",
+ "pallet-grandpa",
+ "pallet-market",
+ "pallet-randomness-collective-flip",
+ "pallet-sudo",
+ "pallet-timestamp",
+ "pallet-transaction-payment",
+ "pallet-transaction-payment-rpc-runtime-api",
+ "parity-scale-codec",
+ "serde",
  "sp-api",
  "sp-block-builder",
- "sp-blockchain",
- "sp-consensus",
  "sp-consensus-aura",
  "sp-core",
- "sp-finality-grandpa",
  "sp-inherents",
+ "sp-offchain",
  "sp-runtime",
+ "sp-session",
+ "sp-std",
  "sp-transaction-pool",
- "structopt",
- "substrate-build-script-utils",
- "substrate-frame-rpc-system",
- "subswap",
+ "sp-version",
+ "substrate-wasm-builder-runner",
 ]
 
 [[package]]
@@ -3567,14 +3568,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-assets"
+name = "pallet-asset"
 version = "2.0.0-rc6"
-source = "git+https://github.com/paritytech/substrate.git?tag=v2.0.0-rc6#be8bb186d87b9d2b47a2907c9b51ae1e252362c3"
 dependencies = [
  "frame-support",
  "frame-system",
  "parity-scale-codec",
  "serde",
+ "sp-core",
+ "sp-io",
  "sp-runtime",
 ]
 
@@ -3670,7 +3672,7 @@ version = "2.0.0-rc6"
 dependencies = [
  "frame-support",
  "frame-system",
- "pallet-assets",
+ "pallet-asset",
  "parity-scale-codec",
  "sp-core",
  "sp-io",
@@ -6697,34 +6699,33 @@ source = "git+https://github.com/paritytech/substrate.git?tag=v2.0.0-rc6#be8bb18
 name = "subswap"
 version = "2.0.0-rc6"
 dependencies = [
- "frame-executive",
- "frame-support",
- "frame-system",
- "frame-system-rpc-runtime-api",
- "pallet-assets",
- "pallet-aura",
- "pallet-balances",
- "pallet-grandpa",
- "pallet-market",
- "pallet-randomness-collective-flip",
- "pallet-sudo",
- "pallet-timestamp",
- "pallet-transaction-payment",
- "pallet-transaction-payment-rpc-runtime-api",
- "parity-scale-codec",
- "serde",
+ "jsonrpc-core",
+ "node-template-runtime",
+ "pallet-transaction-payment-rpc",
+ "sc-basic-authorship",
+ "sc-cli",
+ "sc-client-api",
+ "sc-consensus",
+ "sc-consensus-aura",
+ "sc-executor",
+ "sc-finality-grandpa",
+ "sc-rpc",
+ "sc-rpc-api",
+ "sc-service",
+ "sc-transaction-pool",
  "sp-api",
  "sp-block-builder",
+ "sp-blockchain",
+ "sp-consensus",
  "sp-consensus-aura",
  "sp-core",
+ "sp-finality-grandpa",
  "sp-inherents",
- "sp-offchain",
  "sp-runtime",
- "sp-session",
- "sp-std",
  "sp-transaction-pool",
- "sp-version",
- "substrate-wasm-builder-runner",
+ "structopt",
+ "substrate-build-script-utils",
+ "substrate-frame-rpc-system",
 ]
 
 [[package]]

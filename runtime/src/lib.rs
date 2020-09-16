@@ -25,6 +25,7 @@ use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
 // A few exports that help ease life for downstream crates.
+pub use asset::Call as AssetsCall;
 pub use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{KeyOwnerProofSystem, Randomness},
@@ -34,7 +35,6 @@ pub use frame_support::{
 	},
 	StorageValue,
 };
-pub use pallet_assets::Call as AssetsCall;
 pub use pallet_balances::Call as BalancesCall;
 pub use pallet_timestamp::Call as TimestampCall;
 #[cfg(any(feature = "std", test))]
@@ -43,6 +43,8 @@ pub use sp_runtime::{Perbill, Permill};
 
 /// Import the template pallet.
 pub use market;
+
+pub use asset;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -268,7 +270,7 @@ impl market::Trait for Runtime {
 	type Event = Event;
 }
 
-impl pallet_assets::Trait for Runtime {
+impl asset::Trait for Runtime {
 	type Balance = Balance;
 	type Event = Event;
 	type AssetId = AssetId;
@@ -290,7 +292,7 @@ construct_runtime!(
 		TransactionPayment: pallet_transaction_payment::{Module, Storage},
 		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
 		// Include the custom logic from the template pallet in the runtime.
-		Asset: pallet_assets::{Module, Call, Storage, Event<T>},
+		Asset: asset::{Module, Call, Storage, Event<T>},
 		Market: market::{Module, Call, Storage, Event<T>}
 	}
 );

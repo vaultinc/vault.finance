@@ -196,15 +196,8 @@ decl_error! {
 		/// Error names should be descriptive.
 		NoneValue,
 		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
-		InSufficientBalance,
-		PairExists,
-		LptExists,
-		IdenticalIdentifier,
-		InsufficientLiquidityMinted,
-		InsufficientLiquidityBurned,
-		InsufficientOutputAmount,
-		K,
+		NotTheCreator,
+		NotApproved,
 	}
 }
 

@@ -3,7 +3,7 @@ authors = ['Substrate DevHub <https://github.com/substrate-developer-hub>']
 edition = '2018'
 homepage = 'https://substrate.dev'
 license = 'Unlicense'
-name = 'subswap'
+name = 'node-template-runtime'
 repository = 'https://github.com/substrate-developer-hub/substrate-node-template/'
 version = '2.0.0-rc6'
 
@@ -47,12 +47,6 @@ tag = 'v2.0.0-rc6'
 version = '2.0.0-rc6'
 
 [dependencies.pallet-balances]
-default-features = false
-git = 'https://github.com/paritytech/substrate.git'
-tag = 'v2.0.0-rc6'
-version = '2.0.0-rc6'
-
-[dependencies.pallet-assets]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 tag = 'v2.0.0-rc6'
@@ -171,6 +165,11 @@ package = 'pallet-market'
 path = '../pallets/market'
 version = '2.0.0-rc6'
 
+[dependencies.asset]
+default-features = false
+package = 'pallet-asset'
+path = '../pallets/asset'
+version = '2.0.0-rc6'
 
 [features]
 default = ['std']
@@ -186,7 +185,6 @@ std = [
     'pallet-randomness-collective-flip/std',
     'pallet-sudo/std',
     'pallet-timestamp/std',
-    'pallet-assets/std',
     'pallet-transaction-payment/std',
     'pallet-transaction-payment-rpc-runtime-api/std',
     'serde',
@@ -202,6 +200,7 @@ std = [
     'sp-transaction-pool/std',
     'sp-version/std',
     'market/std',
+    'asset/std'
 ]
 
 [build-dependencies.wasm-builder-runner]

@@ -1,7 +1,7 @@
 use crate::{Module, Trait};
-use asset;
 use frame_support::{impl_outer_origin, parameter_types, weights::Weight};
 use frame_system as system;
+use pallet_assets;
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,

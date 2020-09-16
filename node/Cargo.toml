@@ -5,7 +5,7 @@ description = 'A fresh FRAME-based Substrate node, ready for hacking.'
 edition = '2018'
 homepage = 'https://substrate.dev'
 license = 'Unlicense'
-name = 'node-template'
+name = 'subswap'
 repository = 'https://github.com/substrate-developer-hub/substrate-node-template/'
 version = '2.0.0-rc6'
 
@@ -13,9 +13,9 @@ version = '2.0.0-rc6'
 targets = ['x86_64-unknown-linux-gnu']
 
 [[bin]]
-name = 'node-template'
+name = 'subswap'
 
-[dependencies.subswap]
+[dependencies.node-template-runtime]
 path = '../runtime'
 version = '2.0.0-rc6'
 

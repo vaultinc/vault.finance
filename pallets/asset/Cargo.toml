@@ -4,16 +4,20 @@ description = 'FRAME pallet template for defining custom runtime logic.'
 edition = '2018'
 homepage = 'https://substrate.dev'
 license = 'Unlicense'
-name = 'pallet-market'
+name = 'pallet-asset'
 repository = 'https://github.com/substrate-developer-hub/substrate-node-template/'
 version = '2.0.0-rc6'
 
 [package.metadata.docs.rs]
 targets = ['x86_64-unknown-linux-gnu']
 
+[dependencies.serde]
+version = '1.0.101'
+optional = true
+
 [dependencies.codec]
 default-features = false
-features = ['derive']
+
 package = 'parity-scale-codec'
 version = '1.3.4'
 
@@ -41,13 +45,7 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'v2.0.0-rc6'
 version = '2.0.0-rc6'
 
-[dependencies.asset]
-default-features = false
-package = 'pallet-asset'
-path = '../asset'
-version = '2.0.0-rc6'
-
-[dev-dependencies.sp-runtime]
+[dependencies.sp-runtime]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 tag = 'v2.0.0-rc6'
@@ -56,7 +54,9 @@ version = '2.0.0-rc6'
 [features]
 default = ['std']
 std = [
-    'codec/std',
-    'frame-support/std',
-    'frame-system/std',
+	"serde",
+	"codec/std",
+	"sp-runtime/std",
+	"frame-support/std",
+	"frame-system/std",
 ]
