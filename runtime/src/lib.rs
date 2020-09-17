@@ -46,6 +46,8 @@ pub use market;
 
 pub use asset;
 
+pub use juggernaut;
+
 /// An index to a block.
 pub type BlockNumber = u32;
 
@@ -276,6 +278,10 @@ impl asset::Trait for Runtime {
 	type AssetId = AssetId;
 }
 
+impl juggernaut::Trait for Runtime{
+	type Event = Event;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime where
@@ -293,7 +299,8 @@ construct_runtime!(
 		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
 		// Include the custom logic from the template pallet in the runtime.
 		Asset: asset::{Module, Call, Storage, Event<T>},
-		Market: market::{Module, Call, Storage, Event<T>}
+		Market: market::{Module, Call, Storage, Event<T>},
+		Juggernaut: juggernaut::{Module, Call, Storage, Event<T>}
 	}
 );
 
