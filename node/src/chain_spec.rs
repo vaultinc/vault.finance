@@ -18,7 +18,8 @@ const SUBSWAP_PROPERTIES: &str = r#"
 {
 	"ss58format": 7,
 	"tokenDecimals": 15,
-	"tokenSymbol": "SSWP"	
+	"tokenSymbol": "SSWP"
+}	
 "#;
 
 const SUBSWAP_PROTOCOL_ID: &str = "sswp";
@@ -47,8 +48,9 @@ pub fn authority_keys_from_seed(s: &str) -> (AuraId, GrandpaId) {
 
 pub fn development_config() -> Result<ChainSpec, String> {
 	let wasm_binary = WASM_BINARY.ok_or("Development wasm binary not available".to_string())?;
+	//unwrap propertry, if there is unwrap error
 	let prop_map: serde_json::map::Map<std::string::String, serde_json::value::Value> =
-		json!(SUBSWAP_PROPERTIES).as_object().unwrap().clone();
+		serde_json::from_str(SUBSWAP_PROPERTIES).map_err(|err|format!("json err:{}",err))?;
 	Ok(ChainSpec::from_genesis(
 		// Name
 		"Subswap",
