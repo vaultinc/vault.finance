@@ -368,7 +368,7 @@ impl<T: Trait> Module<T> {
 		Ok(())
 	}
 
-	pub fn issue_from_system(total: T::Balance) {
+	pub fn issue_from_system(total: T::Balance) -> dispatch::DispatchResult {
 		let id = Self::next_asset_id();
 		<NextAssetId<T>>::mutate(|id| *id += One::one());
 
@@ -377,5 +377,6 @@ impl<T: Trait> Module<T> {
 		<Creator<T>>::insert(id, &T::AccountId::default());
 
 		Self::deposit_event(RawEvent::Issued(id, T::AccountId::default(), total));
+		Ok(())
 	}
 }
