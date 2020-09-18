@@ -264,7 +264,7 @@ decl_module! {
 					// Mint LPtoken to the sender
 					asset::Module::<T>::mint_from_system(&lpt, &sender, &lptoken_amount)?;
 					Self::deposit_event(RawEvent::CreatePair(token0, token1, lpt));
-					Self::_update(&lpt);
+					Self::_update(&lpt)?;
 					Ok(())
 				},
 				Some(lpt) if asset::Module::<T>::total_supply(lpt) < T::Balance::from(0) => {
@@ -302,7 +302,7 @@ decl_module! {
 			// Deposit event that the liquidity is burned successfully
 			Self::deposit_event(RawEvent::BurnedLiquidity(lpt, tokens.0, tokens.1));
 			// Update price
-			Self::_update(&lpt);
+			Self::_update(&lpt)?;
 			Ok(())
 		}
 
@@ -341,6 +341,7 @@ impl<T: Trait> Module<T> {
 				&pair,
 				(&price0_cumulative_last, &price1_cumulative_last),
 			);
+			<LastBlockTimestamp<T>>::put(block_timestamp);
 			Self::deposit_event(RawEvent::Sync(
 				price0_cumulative_last,
 				price1_cumulative_last,
