@@ -246,6 +246,8 @@ decl_module! {
 					lptoken_id -= One::one();
 					// Mint LPtoken to the sender
 					asset::Module::<T>::mint_from_system(&lptoken_id, &sender, &lptoken_amount)?;
+					// Insert pair info
+					<Pairs<T>>::insert(lptoken_id, (token0, token1));
 					Self::deposit_event(RawEvent::CreatePair(token0, token1, lptoken_id));
 					Ok(())
 				},
