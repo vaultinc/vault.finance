@@ -239,7 +239,7 @@ decl_module! {
 					// Deposit assets to the reserve
 					<Reserves<T>>::insert(&token0, (amount0, amount1));
 					let mut lptoken_amount: T::Balance = math::sqrt::<T>(amount0 * amount1);
-					lptoken_amount = lptoken_amount.checked_sub(&minimum_liquidity).expect("Integer Underflow");
+					lptoken_amount = lptoken_amount.checked_sub(&minimum_liquidity).expect("Integer overflow");
 					// Issue LPtoken
 					asset::Module::<T>::issue_from_system(T::Balance::from(0))?;
 					let mut lptoken_id: T::AssetId = asset::NextAssetId::<T>::get();
@@ -253,8 +253,8 @@ decl_module! {
 				Some(lpt) if asset::Module::<T>::total_supply(lpt) > T::Balance::from(0) => {
 					let total_supply = asset::Module::<T>::total_supply(lpt);
 					let reserves = <Reserves<T>>::get(lpt);
-					let left = amount0.checked_mul(&total_supply).expect("Multiplication Overflow").checked_div(&reserves.0).expect("division by zero");
-					let right = amount1.checked_mul(&total_supply).expect("Multiplication Overflow").checked_div(&reserves.1).expect("division by zero");
+					let left = amount0.checked_mul(&total_supply).expect("Multiplicaiton overflow").checked_div(&reserves.0).expect("Divide by zero error");
+					let right = amount1.checked_mul(&total_supply).expect("Multiplicaiton overflow").checked_div(&reserves.1).expect("Divide by zero error");
 					let lptoken_amount = math::min::<T>(left, right);
 					// Deposit assets to the reserve
 					<Reserves<T>>::mutate(lpt, |reserves| {
@@ -282,8 +282,8 @@ decl_module! {
 			let total_supply = asset::Module::<T>::total_supply(lpt);
 
 			// Calculate rewards for providing liquidity with pro-rata distribution
-			let reward0 = amount.checked_mul(&reserves.0).expect("overflow").checked_div(&total_supply).expect("cannot divide by zero");
-			let reward1 = amount.checked_mul(&reserves.1).expect("overflow").checked_div(&total_supply).expect("cannot divide by zero");
+			let reward0 = amount.checked_mul(&reserves.0).expect("Multiplicaiton overflow").checked_div(&total_supply).expect("Divide by zero error");
+			let reward1 = amount.checked_mul(&reserves.1).expect("Multiplicaiton overflow").checked_div(&total_supply).expect("Divide by zero error");
 
 			// Ensure rewards exist
 			ensure!(reward0 > Zero::zero() && reward1 > Zero::zero(), Error::<T>::InsufficientLiquidityBurned);
@@ -321,7 +321,7 @@ impl<T: Trait> Module<T> {
 		let rootK: T::Balance = math::sqrt::<T>(
 			reserve0
 				.checked_mul(&reserve1)
-				.expect("Multiplication Overflow"),
+				.expect("Multiplicaiton overflow"),
 		);
 		//let rootKLast: T::Balance = math::sqrt()
 	}
