@@ -93,7 +93,7 @@
 //!
 //! decl_module! {
 //! 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-//! 		pub fn issue_liquidity_token(origin, token0: T::AssetId, amount0: T::Balance, token1: T::AssetId, amount1: T::Balance) -> dispatch::DispatchResult {
+//! 		pub fn issue_liquidity_token(origin, token0: T::AssetId, amount0: <T as asset::Trait>::Balance, token1: T::AssetId, amount1: <T as asset::Trait>::Balance) -> dispatch::DispatchResult {
 //! 			let sender = ensure_signed(origin).map_err(|e| e.as_str())?;
 //!
 //! 			const ACA: u64 = 1;
@@ -133,17 +133,22 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use asset;
+use pallet_balances;
 mod math;
 use crate::sp_api_hidden_includes_decl_storage::hidden_include::sp_runtime::traits::*;
 use crate::sp_api_hidden_includes_decl_storage::hidden_include::sp_runtime::FixedPointNumber;
+use crate::sp_api_hidden_includes_decl_storage::hidden_include::traits::StoredMap;
+
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
 /// https://substrate.dev/docs/en/knowledgebase/runtime/frame
 use frame_support::{
-	decl_error, decl_event, decl_module, decl_storage, dispatch, ensure, traits::Get,
+    decl_error, decl_event, decl_module, decl_storage, dispatch, ensure,
+    traits::{ExistenceRequirement, Get, WithdrawReason},
 };
 use frame_system::ensure_signed;
 use pallet_timestamp as timestamp;
+use sp_runtime::traits::Zero;
 use sp_runtime::FixedU128;
 
 #[cfg(test)]
@@ -152,203 +157,232 @@ mod mock;
 #[cfg(test)]
 mod tests;
 /// Configure the pallet by specifying the parameters and types on which it depends.
-pub trait Trait: frame_system::Trait + asset::Trait + timestamp::Trait {
-	/// Because this pallet emits events, it depends on the runtime's definition of an event.
-	type Event: From<Event<Self>>
-		+ Into<<Self as frame_system::Trait>::Event>
-		+ Into<<Self as asset::Trait>::Event>;
+pub trait Trait:
+    frame_system::Trait + asset::Trait + timestamp::Trait + pallet_balances::Trait
+{
+    /// Because this pallet emits events, it depends on the runtime's definition of an event.
+    type Event: From<Event<Self>>
+        + Into<<Self as frame_system::Trait>::Event>
+        + Into<<Self as asset::Trait>::Event>;
 }
 
 // The pallet's runtime storage items.
 // https://substrate.dev/docs/en/knowledgebase/runtime/storage
 decl_storage! {
-	trait Store for Module<T: Trait> as SwapModule {
-		pub LastBlockTimestamp get(fn last_block_timestamp): T::Moment;
-		// Accumulated price data for each pair. key is lptoken identifier
-		pub LastAccumulativePrice get(fn last_cumulative_price): map hasher(blake2_128_concat) T::AssetId => (FixedU128, FixedU128);
-		pub Reserves get(fn reserves): map hasher(blake2_128_concat) T::AssetId => (T::Balance, T::Balance);
-		pub Pairs get(fn pair): map hasher(blake2_128_concat) T::AssetId => (T::AssetId, T::AssetId);
-		pub LPTokens get(fn lpt): map hasher(blake2_128_concat) (T::AssetId, T::AssetId) => Option<T::AssetId>;
-	}
+    trait Store for Module<T: Trait> as SwapModule {
+        pub LastBlockTimestamp get(fn last_block_timestamp): T::Moment;
+        // Accumulated price data for each pair. key is lptoken identifier
+        pub LastAccumulativePrice get(fn last_cumulative_price): map hasher(blake2_128_concat) T::AssetId => (FixedU128, FixedU128);
+        pub Reserves get(fn reserves): map hasher(blake2_128_concat) T::AssetId => (<T as asset::Trait>::Balance, <T as asset::Trait>::Balance);
+        pub Pairs get(fn pair): map hasher(blake2_128_concat) T::AssetId => (T::AssetId, T::AssetId);
+        pub LPTokens get(fn lpt): map hasher(blake2_128_concat) (T::AssetId, T::AssetId) => Option<T::AssetId>;
+    }
 }
 
 // Pallets use events to inform users when important changes are made.
 // https://substrate.dev/docs/en/knowledgebase/runtime/events
 decl_event!(
-	pub enum Event<T>
-	where
-		AccountId = <T as frame_system::Trait>::AccountId,
-		Token0 = <T as asset::Trait>::AssetId,
-		Token1 = <T as asset::Trait>::AssetId,
-		LPToken = <T as asset::Trait>::AssetId,
-		Balance = <T as asset::Trait>::Balance,
-	{
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored(u32, AccountId),
-		CreatePair(Token0, Token1, LPToken),
-		Swap(Token0, Balance, Token1, Balance),
-		MintedLiquidity(Token0, Token1, LPToken),
-		BurnedLiquidity(LPToken, Token0, Token1),
-		Sync(FixedU128, FixedU128),
-	}
+    pub enum Event<T>
+    where
+        AccountId = <T as frame_system::Trait>::AccountId,
+        Token0 = <T as asset::Trait>::AssetId,
+        Token1 = <T as asset::Trait>::AssetId,
+        LPToken = <T as asset::Trait>::AssetId,
+        Balance = <T as asset::Trait>::Balance,
+    {
+        /// Event documentation should end with an array that provides descriptive names for event
+        /// parameters. [something, who]
+        SomethingStored(u32, AccountId),
+        CreatePair(Token0, Token1, LPToken),
+        Swap(Token0, Balance, Token1, Balance),
+        MintedLiquidity(Token0, Token1, LPToken),
+        BurnedLiquidity(LPToken, Token0, Token1),
+        Sync(FixedU128, FixedU128),
+    }
 );
 
 // Errors inform users that something went wrong.
 decl_error! {
-	pub enum Error for Module<T: Trait> {
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
-		InSufficientBalance,
-		PairExists,
-		LptExists,
-		IdenticalIdentifier,
-		InsufficientLiquidityMinted,
-		InsufficientLiquidityBurned,
-		InsufficientOutputAmount,
-		K,
-	}
+    pub enum Error for Module<T: Trait> {
+        /// Error names should be descriptive.
+        NoneValue,
+        /// Errors should have helpful documentation associated with them.
+        StorageOverflow,
+        InSufficientBalance,
+        PairExists,
+        LptExists,
+        IdenticalIdentifier,
+        InsufficientLiquidityMinted,
+        InsufficientLiquidityBurned,
+        InsufficientOutputAmount,
+        K,
+    }
 }
 
 // Dispatchable functions allows users to interact with the pallet and invoke state changes.
 // These functions materialize as "extrinsics", which are often compared to transactions.
 // Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 decl_module! {
-	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-		// Errors must be initialized if they are used by the pallet.
-		type Error = Error<T>;
+    pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+        // Errors must be initialized if they are used by the pallet.
+        type Error = Error<T>;
 
-		// Events must be initialized if they are used by the pallet.
-		fn deposit_event() = default;
+        // Events must be initialized if they are used by the pallet.
+        fn deposit_event() = default;
 
 
-		// Mint liquidity by adding a liquidity in a pair
-		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn mint_liquidity(origin, token0: T::AssetId, amount0: T::Balance, token1: T::AssetId, amount1: T::Balance) -> dispatch::DispatchResult {
-			let minimum_liquidity = T::Balance::from(1);
-			let sender = ensure_signed(origin)?;
+        // Mint liquidity by adding a liquidity in a pair
+        #[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
+        pub fn mint_liquidity(origin, token0: T::AssetId, amount0: <T as asset::Trait>::Balance, token1: T::AssetId, amount1: <T as asset::Trait>::Balance) -> dispatch::DispatchResult {
+            let minimum_liquidity = <T as asset::Trait>::Balance::from(1);
+            let sender = ensure_signed(origin)?;
 
-			// Burn assets from user to deposit to reserves
-			asset::Module::<T>::burn_from_system(&token0, &sender, &amount0)?;
-			asset::Module::<T>::burn_from_system(&token1, &sender, &amount1)?;
-			match LPTokens::<T>::get((&token0, &token1)) {
-				// create pair if lpt does not exist
-				None => {
-					// Deposit assets to the reserve
-					<Reserves<T>>::insert(&token0, (amount0, amount1));
-					let mut lptoken_amount: T::Balance = math::sqrt::<T>(amount0 * amount1);
-					lptoken_amount = lptoken_amount.checked_sub(&minimum_liquidity).expect("Integer overflow");
-					// Issue LPtoken
-					asset::Module::<T>::issue_from_system(T::Balance::from(0))?;
-					let mut lptoken_id: T::AssetId = asset::NextAssetId::<T>::get();
-					lptoken_id -= One::one();
-					// Mint LPtoken to the sender
-					asset::Module::<T>::mint_from_system(&lptoken_id, &sender, &lptoken_amount)?;
-					// Insert pair info
-					<Pairs<T>>::insert(lptoken_id, (token0, token1));
-					Self::deposit_event(RawEvent::CreatePair(token0, token1, lptoken_id));
-					Ok(())
-				},
-				// when lpt exists and total supply is superset of 0
-				Some(lpt) if asset::Module::<T>::total_supply(lpt) > T::Balance::from(0) => {
-					let total_supply = asset::Module::<T>::total_supply(lpt);
-					let reserves = <Reserves<T>>::get(lpt);
-					let left = amount0.checked_mul(&total_supply).expect("Multiplicaiton overflow").checked_div(&reserves.0).expect("Divide by zero error");
-					let right = amount1.checked_mul(&total_supply).expect("Multiplicaiton overflow").checked_div(&reserves.1).expect("Divide by zero error");
-					let lptoken_amount = math::min::<T>(left, right);
-					// Deposit assets to the reserve
-					<Reserves<T>>::mutate(lpt, |reserves| {
-						reserves.0 += amount0;
-						reserves.1 += amount1;
-					});
-					// Mint LPtoken to the sender
-					asset::Module::<T>::mint_from_system(&lpt, &sender, &lptoken_amount)?;
-					Self::deposit_event(RawEvent::CreatePair(token0, token1, lpt));
-					Self::_update(&lpt)?;
-					Ok(())
-				},
-				Some(lpt) if asset::Module::<T>::total_supply(lpt) < T::Balance::from(0) => {
-					Err(Error::<T>::InsufficientLiquidityMinted)?
-				},
-				Some(_) => Err(Error::<T>::NoneValue)?,
-			}
-		}
+            // Burn assets from user to deposit to reserves
+            asset::Module::<T>::burn_from_system(&token0, &sender, &amount0)?;
+            asset::Module::<T>::burn_from_system(&token1, &sender, &amount1)?;
+            match LPTokens::<T>::get((&token0, &token1)) {
+                // create pair if lpt does not exist
+                None => {
+                    // Deposit assets to the reserve
+                    <Reserves<T>>::insert(&token0, (amount0, amount1));
+                    let mut lptoken_amount: <T as asset::Trait>::Balance = math::sqrt::<T>(amount0 * amount1);
+                    lptoken_amount = lptoken_amount.checked_sub(&minimum_liquidity).expect("Integer overflow");
+                    // Issue LPtoken
+                    asset::Module::<T>::issue_from_system(<T as asset::Trait>::Balance::from(0))?;
+                    let mut lptoken_id: T::AssetId = asset::NextAssetId::<T>::get();
+                    lptoken_id -= One::one();
+                    // Mint LPtoken to the sender
+                    asset::Module::<T>::mint_from_system(&lptoken_id, &sender, &lptoken_amount)?;
+                    // Insert pair info
+                    <Pairs<T>>::insert(lptoken_id, (token0, token1));
+                    Self::deposit_event(RawEvent::CreatePair(token0, token1, lptoken_id));
+                    Ok(())
+                },
+                // when lpt exists and total supply is superset of 0
+                Some(lpt) if asset::Module::<T>::total_supply(lpt) > <T as asset::Trait>::Balance::from(0) => {
+                    let total_supply = asset::Module::<T>::total_supply(lpt);
+                    let reserves = <Reserves<T>>::get(lpt);
+                    let left = amount0.checked_mul(&total_supply).expect("Multiplicaiton overflow").checked_div(&reserves.0).expect("Divide by zero error");
+                    let right = amount1.checked_mul(&total_supply).expect("Multiplicaiton overflow").checked_div(&reserves.1).expect("Divide by zero error");
+                    let lptoken_amount = math::min::<T>(left, right);
+                    // Deposit assets to the reserve
+                    <Reserves<T>>::mutate(lpt, |reserves| {
+                        reserves.0 += amount0;
+                        reserves.1 += amount1;
+                    });
+                    // Mint LPtoken to the sender
+                    asset::Module::<T>::mint_from_system(&lpt, &sender, &lptoken_amount)?;
+                    Self::deposit_event(RawEvent::CreatePair(token0, token1, lpt));
+                    Self::_update(&lpt)?;
+                    Ok(())
+                },
+                Some(lpt) if asset::Module::<T>::total_supply(lpt) < <T as asset::Trait>::Balance::from(0) => {
+                    Err(Error::<T>::InsufficientLiquidityMinted)?
+                },
+                Some(_) => Err(Error::<T>::NoneValue)?,
+            }
+        }
 
-		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn burn_liquidity(origin, lpt: T::AssetId, amount: T::Balance) -> dispatch::DispatchResult{
-			let sender = ensure_signed(origin)?;
-			let reserves = <Reserves<T>>::get(lpt);
-			let tokens = <Pairs<T>>::get(lpt);
-			let total_supply = asset::Module::<T>::total_supply(lpt);
+        #[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
+        pub fn burn_liquidity(origin, lpt: T::AssetId, amount: <T as asset::Trait>::Balance) -> dispatch::DispatchResult{
+            let sender = ensure_signed(origin)?;
+            let reserves = <Reserves<T>>::get(lpt);
+            let tokens = <Pairs<T>>::get(lpt);
+            let total_supply = asset::Module::<T>::total_supply(lpt);
 
-			// Calculate rewards for providing liquidity with pro-rata distribution
-			let reward0 = amount.checked_mul(&reserves.0).expect("Multiplicaiton overflow").checked_div(&total_supply).expect("Divide by zero error");
-			let reward1 = amount.checked_mul(&reserves.1).expect("Multiplicaiton overflow").checked_div(&total_supply).expect("Divide by zero error");
+            // Calculate rewards for providing liquidity with pro-rata distribution
+            let reward0 = amount.checked_mul(&reserves.0).expect("Multiplicaiton overflow").checked_div(&total_supply).expect("Divide by zero error");
+            let reward1 = amount.checked_mul(&reserves.1).expect("Multiplicaiton overflow").checked_div(&total_supply).expect("Divide by zero error");
 
-			// Ensure rewards exist
-			ensure!(reward0 > Zero::zero() && reward1 > Zero::zero(), Error::<T>::InsufficientLiquidityBurned);
+            // Ensure rewards exist
+            ensure!(reward0 > Zero::zero() && reward1 > Zero::zero(), Error::<T>::InsufficientLiquidityBurned);
 
-			// Distribute reward to the sender
-			asset::Module::<T>::burn_from_system(&lpt, &sender, &amount)?;
-			asset::Module::<T>::mint_from_system(&tokens.0, &sender, &reward0)?;
-			asset::Module::<T>::mint_from_system(&tokens.1, &sender, &reward1)?;
+            // Distribute reward to the sender
+            asset::Module::<T>::burn_from_system(&lpt, &sender, &amount)?;
+            asset::Module::<T>::mint_from_system(&tokens.0, &sender, &reward0)?;
+            asset::Module::<T>::mint_from_system(&tokens.1, &sender, &reward1)?;
 
-			// Update reserve when the balance is set
-			<Reserves<T>>::mutate(lpt, |reserves| {
-				reserves.0 -= reward0;
-				reserves.1 -= reward1;
-			});
+            // Update reserve when the balance is set
+            <Reserves<T>>::mutate(lpt, |reserves| {
+                reserves.0 -= reward0;
+                reserves.1 -= reward1;
+            });
 
-			// Deposit event that the liquidity is burned successfully
-			Self::deposit_event(RawEvent::BurnedLiquidity(lpt, tokens.0, tokens.1));
-			// Update price
-			Self::_update(&lpt)?;
-			Ok(())
-		}
+            // Deposit event that the liquidity is burned successfully
+            Self::deposit_event(RawEvent::BurnedLiquidity(lpt, tokens.0, tokens.1));
+            // Update price
+            Self::_update(&lpt)?;
+            Ok(())
+        }
 
-		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn swap(origin, from: T::AssetId, amount: T::Balance, to: T::AssetId) -> dispatch::DispatchResult {
-			let sender = ensure_signed(origin)?;
-			Ok(())
-		}
-	}
+        #[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
+        pub fn swap(origin, from: T::AssetId, amount: <T as asset::Trait>::Balance, to: T::AssetId) -> dispatch::DispatchResult {
+            let sender = ensure_signed(origin)?;
+            Ok(())
+        }
+    }
 }
 // The main implementation block for the module.
 impl<T: Trait> Module<T> {
-	// TODO: add fee option for pair creators
-	// if fee is on, mint liquidity equivalent to 1/6th of the growth in sqrt(k)
-	pub fn _mint_fee(reserve0: T::Balance, reserve1: T::Balance) {
-		let rootK: T::Balance = math::sqrt::<T>(
-			reserve0
-				.checked_mul(&reserve1)
-				.expect("Multiplicaiton overflow"),
-		);
-		//let rootKLast: T::Balance = math::sqrt()
-	}
+    // TODO: add fee option for pair creators
+    // if fee is on, mint liquidity equivalent to 1/6th of the growth in sqrt(k)
+    pub fn _mint_fee(
+        reserve0: <T as asset::Trait>::Balance,
+        reserve1: <T as asset::Trait>::Balance,
+    ) -> bool {
+        let rootK: <T as asset::Trait>::Balance = math::sqrt::<T>(
+            reserve0
+                .checked_mul(&reserve1)
+                .expect("Multiplicaiton overflow"),
+        );
+        //let rootKLast: <T as asset::Trait>::Balance = math::sqrt()
+        return true;
+    }
 
-	fn _update(pair: &T::AssetId) -> dispatch::DispatchResult {
-		let block_timestamp = <timestamp::Module<T>>::get() % T::Moment::from(2u32.pow(32));
-		let time_elapsed = block_timestamp - Self::last_block_timestamp();
-		let reserves = <Reserves<T>>::get(pair);
-		if time_elapsed > Zero::zero() && reserves.0 != Zero::zero() && reserves.1 != Zero::zero() {
-			let reserve0 = FixedU128::saturating_from_integer(reserves.0.saturated_into());
-			let reserve1 = FixedU128::saturating_from_integer(reserves.1.saturated_into());
-			let price0_cumulative_last = reserve1.checked_div(&reserve0).unwrap()
-				* FixedU128::saturating_from_integer(time_elapsed.saturated_into());
-			let price1_cumulative_last = reserve0.checked_div(&reserve1).unwrap()
-				* FixedU128::saturating_from_integer(time_elapsed.saturated_into());
-			<LastAccumulativePrice<T>>::insert(
-				&pair,
-				(&price0_cumulative_last, &price1_cumulative_last),
-			);
-			<LastBlockTimestamp<T>>::put(block_timestamp);
-			Self::deposit_event(RawEvent::Sync(
-				price0_cumulative_last,
-				price1_cumulative_last,
-			));
-		}
-		Ok(())
-	}
+    fn _burn_token(
+        id: &T::AssetId,
+        target: &T::AccountId,
+        amount: &<T as asset::Trait>::Balance,
+    ) -> dispatch::DispatchResult {
+        asset::Module::<T>::burn_from_system(id, target, amount)?;
+        if *id == Zero::zero() {
+            let account = <T as pallet_balances::Trait>::AccountStore::get(target);
+            pallet_balances::Module::<T>::mutate_account(target, |account| {})
+        }
+        Ok(())
+    }
+
+    fn _mint_token(
+        id: &T::AssetId,
+        target: &T::AccountId,
+        amount: &<T as asset::Trait>::Balance,
+    ) -> dispatch::DispatchResult {
+        asset::Module::<T>::mint_from_system(id, target, amount)?;
+        if *id == Zero::zero() {}
+        Ok(())
+    }
+
+    fn _update(pair: &T::AssetId) -> dispatch::DispatchResult {
+        let block_timestamp = <timestamp::Module<T>>::get() % T::Moment::from(2u32.pow(32));
+        let time_elapsed = block_timestamp - Self::last_block_timestamp();
+        let reserves = <Reserves<T>>::get(pair);
+        if time_elapsed > Zero::zero() && reserves.0 != Zero::zero() && reserves.1 != Zero::zero() {
+            let reserve0 = FixedU128::saturating_from_integer(reserves.0.saturated_into());
+            let reserve1 = FixedU128::saturating_from_integer(reserves.1.saturated_into());
+            let price0_cumulative_last = reserve1.checked_div(&reserve0).unwrap()
+                * FixedU128::saturating_from_integer(time_elapsed.saturated_into());
+            let price1_cumulative_last = reserve0.checked_div(&reserve1).unwrap()
+                * FixedU128::saturating_from_integer(time_elapsed.saturated_into());
+            <LastAccumulativePrice<T>>::insert(
+                &pair,
+                (&price0_cumulative_last, &price1_cumulative_last),
+            );
+            <LastBlockTimestamp<T>>::put(block_timestamp);
+            Self::deposit_event(RawEvent::Sync(
+                price0_cumulative_last,
+                price1_cumulative_last,
+            ));
+        }
+        Ok(())
+    }
 }

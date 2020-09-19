@@ -135,7 +135,7 @@
 
 use codec::{Decode, Encode};
 use frame_support::{
-	decl_error, decl_event, decl_module, decl_storage, dispatch, ensure, Parameter,
+    decl_error, decl_event, decl_module, decl_storage, dispatch, ensure, Parameter,
 };
 use frame_system::ensure_signed;
 use sp_runtime::traits::One;
@@ -145,238 +145,238 @@ use sp_std::default::Default;
 /// Data storage type for each account
 #[derive(Encode, Decode, Clone, Eq, PartialEq)]
 pub enum Account<AccountId> {
-	User(AccountId),
-	System(),
+    User(AccountId),
+    System(),
 }
 
 /// The module configuration trait.
 pub trait Trait: frame_system::Trait {
-	/// The overarching event type.
-	type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
+    /// The overarching event type.
+    type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
 
-	/// The units in which we record balances.
-	type Balance: Member + Parameter + AtLeast32BitUnsigned + Default + Copy;
+    /// The units in which we record balances.
+    type Balance: Member + Parameter + AtLeast32BitUnsigned + Default + Copy;
 
-	/// The arithmetic type of asset identifier.
-	type AssetId: Parameter + AtLeast32Bit + Default + Copy;
+    /// The arithmetic type of asset identifier.
+    type AssetId: Parameter + AtLeast32Bit + Default + Copy;
 }
 
 decl_module! {
-	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-		type Error = Error<T>;
-		fn deposit_event() = default;
-		/// Issue a new class of fungible assets. There are, and will only ever be, `total`
-		/// such assets and they'll all belong to the `origin` initially. It will have an
-		/// identifier `AssetId` instance: this will be specified in the `Issued` event.
-		///
-		/// # <weight>
-		/// - `O(1)`
-		/// - 1 storage mutation (codec `O(1)`).
-		/// - 2 storage writes (condec `O(1)`).
-		/// - 1 event.
-		/// # </weight>
-		#[weight = 0]
-		fn issue(origin, #[compact] total: T::Balance) {
-			let origin = ensure_signed(origin)?;
+    pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+        type Error = Error<T>;
+        fn deposit_event() = default;
+        /// Issue a new class of fungible assets. There are, and will only ever be, `total`
+        /// such assets and they'll all belong to the `origin` initially. It will have an
+        /// identifier `AssetId` instance: this will be specified in the `Issued` event.
+        ///
+        /// # <weight>
+        /// - `O(1)`
+        /// - 1 storage mutation (codec `O(1)`).
+        /// - 2 storage writes (condec `O(1)`).
+        /// - 1 event.
+        /// # </weight>
+        #[weight = 0]
+        fn issue(origin, #[compact] total: T::Balance) {
+            let origin = ensure_signed(origin)?;
 
-			let id = Self::next_asset_id();
-			<NextAssetId<T>>::mutate(|id| *id += One::one());
+            let id = Self::next_asset_id();
+            <NextAssetId<T>>::mutate(|id| *id += One::one());
 
-			<Balances<T>>::insert((id, &origin), total);
-			<TotalSupply<T>>::insert(id, total);
-			<Creator<T>>::insert(id, &origin);
+            <Balances<T>>::insert((id, &origin), total);
+            <TotalSupply<T>>::insert(id, total);
+            <Creator<T>>::insert(id, &origin);
 
-			Self::deposit_event(RawEvent::Issued(id, origin, total));
-		}
+            Self::deposit_event(RawEvent::Issued(id, origin, total));
+        }
 
-		/// Move some assets from one holder to another.
-		///
-		/// # <weight>
-		/// - `O(1)`
-		/// - 1 static lookup
-		/// - 2 storage mutations (codec `O(1)`).
-		/// - 1 event.
-		/// # </weight>
-		#[weight = 0]
-		fn transfer(origin,
-			#[compact] id: T::AssetId,
-			target: <T::Lookup as StaticLookup>::Source,
-			#[compact] amount: T::Balance
-		) {
-			let origin = ensure_signed(origin)?;
-			let origin_account = (id, origin.clone());
-			let origin_balance = <Balances<T>>::get(&origin_account);
-			let target = T::Lookup::lookup(target)?;
-			ensure!(!amount.is_zero(), Error::<T>::AmountZero);
-			ensure!(origin_balance >= amount, Error::<T>::BalanceLow);
+        /// Move some assets from one holder to another.
+        ///
+        /// # <weight>
+        /// - `O(1)`
+        /// - 1 static lookup
+        /// - 2 storage mutations (codec `O(1)`).
+        /// - 1 event.
+        /// # </weight>
+        #[weight = 0]
+        fn transfer(origin,
+            #[compact] id: T::AssetId,
+            target: <T::Lookup as StaticLookup>::Source,
+            #[compact] amount: T::Balance
+        ) {
+            let origin = ensure_signed(origin)?;
+            let origin_account = (id, origin.clone());
+            let origin_balance = <Balances<T>>::get(&origin_account);
+            let target = T::Lookup::lookup(target)?;
+            ensure!(!amount.is_zero(), Error::<T>::AmountZero);
+            ensure!(origin_balance >= amount, Error::<T>::BalanceLow);
 
-			Self::deposit_event(RawEvent::Transferred(id, origin, target.clone(), amount));
-			<Balances<T>>::insert(origin_account, origin_balance - amount);
-			<Balances<T>>::mutate((id, target), |balance| *balance += amount);
-		}
+            Self::deposit_event(RawEvent::Transferred(id, origin, target.clone(), amount));
+            <Balances<T>>::insert(origin_account, origin_balance - amount);
+            <Balances<T>>::mutate((id, target), |balance| *balance += amount);
+        }
 
-		/// Mint any assets of `id` owned by `origin`.
-		///
-		/// # <weight>
-		/// - `O(1)`
-		/// - 1 storage mutation (codec `O(1)`).
-		/// - 1 storage deletion (codec `O(1)`).
-		/// - 1 event.
-		/// # </weight>
-		#[weight = 0]
-		fn mint(origin,
-			 #[compact] id: T::AssetId,
-			target: <T::Lookup as StaticLookup>::Source,
-			#[compact] amount: T::Balance
-		){
-			let origin = ensure_signed(origin)?;
-			let target = T::Lookup::lookup(target)?;
-			let creator = <Creator<T>>::get(id);
-			ensure!(origin == creator, Error::<T>::NotTheCreator);
-			ensure!(!amount.is_zero(), Error::<T>::AmountZero);
+        /// Mint any assets of `id` owned by `origin`.
+        ///
+        /// # <weight>
+        /// - `O(1)`
+        /// - 1 storage mutation (codec `O(1)`).
+        /// - 1 storage deletion (codec `O(1)`).
+        /// - 1 event.
+        /// # </weight>
+        #[weight = 0]
+        fn mint(origin,
+             #[compact] id: T::AssetId,
+            target: <T::Lookup as StaticLookup>::Source,
+            #[compact] amount: T::Balance
+        ){
+            let origin = ensure_signed(origin)?;
+            let target = T::Lookup::lookup(target)?;
+            let creator = <Creator<T>>::get(id);
+            ensure!(origin == creator, Error::<T>::NotTheCreator);
+            ensure!(!amount.is_zero(), Error::<T>::AmountZero);
 
-			Self::deposit_event(RawEvent::Minted(id, target.clone(), amount));
-			<Balances<T>>::mutate((id, target), |balance| *balance += amount);
-		}
+            Self::deposit_event(RawEvent::Minted(id, target.clone(), amount));
+            <Balances<T>>::mutate((id, target), |balance| *balance += amount);
+        }
 
-		/// Burn any assets of `id` owned by `origin`.
-		///
-		/// # <weight>
-		/// - `O(1)`
-		/// - 1 storage mutation (codec `O(1)`).
-		/// - 1 storage deletion (codec `O(1)`).
-		/// - 1 event.
-		/// # </weight>
-		#[weight = 0]
-		fn burn(origin,
-			#[compact] id: T::AssetId,
-		   target: <T::Lookup as StaticLookup>::Source,
-		   #[compact] amount: T::Balance
-	   ){
-		   let origin = ensure_signed(origin)?;
-		   let origin_account = (id, origin.clone());
-		   let origin_balance = <Balances<T>>::get(&origin_account);
-		   ensure!(!amount.is_zero(), Error::<T>::AmountZero);
-		   ensure!(origin_balance >= amount, Error::<T>::BalanceLow);
+        /// Burn any assets of `id` owned by `origin`.
+        ///
+        /// # <weight>
+        /// - `O(1)`
+        /// - 1 storage mutation (codec `O(1)`).
+        /// - 1 storage deletion (codec `O(1)`).
+        /// - 1 event.
+        /// # </weight>
+        #[weight = 0]
+        fn burn(origin,
+            #[compact] id: T::AssetId,
+           target: <T::Lookup as StaticLookup>::Source,
+           #[compact] amount: T::Balance
+       ){
+           let origin = ensure_signed(origin)?;
+           let origin_account = (id, origin.clone());
+           let origin_balance = <Balances<T>>::get(&origin_account);
+           ensure!(!amount.is_zero(), Error::<T>::AmountZero);
+           ensure!(origin_balance >= amount, Error::<T>::BalanceLow);
 
-		   Self::deposit_event(RawEvent::Burned(id, origin, amount));
-		   <Balances<T>>::insert(origin_account, origin_balance - amount);
-	   }
+           Self::deposit_event(RawEvent::Burned(id, origin, amount));
+           <Balances<T>>::insert(origin_account, origin_balance - amount);
+       }
 
-		/// Destroy any assets of `id` owned by `origin`.
-		///
-		/// # <weight>
-		/// - `O(1)`
-		/// - 1 storage mutation (codec `O(1)`).
-		/// - 1 storage deletion (codec `O(1)`).
-		/// - 1 event.
-		/// # </weight>
-		#[weight = 0]
-		fn destroy(origin, #[compact] id: T::AssetId) {
-			let origin = ensure_signed(origin)?;
-			let balance = <Balances<T>>::take((id, &origin));
-			ensure!(!balance.is_zero(), Error::<T>::BalanceZero);
+        /// Destroy any assets of `id` owned by `origin`.
+        ///
+        /// # <weight>
+        /// - `O(1)`
+        /// - 1 storage mutation (codec `O(1)`).
+        /// - 1 storage deletion (codec `O(1)`).
+        /// - 1 event.
+        /// # </weight>
+        #[weight = 0]
+        fn destroy(origin, #[compact] id: T::AssetId) {
+            let origin = ensure_signed(origin)?;
+            let balance = <Balances<T>>::take((id, &origin));
+            ensure!(!balance.is_zero(), Error::<T>::BalanceZero);
 
-			<TotalSupply<T>>::mutate(id, |total_supply| *total_supply -= balance);
-			Self::deposit_event(RawEvent::Destroyed(id, origin, balance));
-		}
-	}
+            <TotalSupply<T>>::mutate(id, |total_supply| *total_supply -= balance);
+            Self::deposit_event(RawEvent::Destroyed(id, origin, balance));
+        }
+    }
 }
 
 decl_event! {
-	pub enum Event<T> where
-		<T as frame_system::Trait>::AccountId,
-		<T as Trait>::Balance,
-		<T as Trait>::AssetId,
-	{
-		/// Some assets were issued. \[asset_id, owner, total_supply\]
-		Issued(AssetId, AccountId, Balance),
-		/// Some assets were transferred. \[asset_id, from, to, amount\]
-		Transferred(AssetId, AccountId, AccountId, Balance),
-		/// Some assets were minted. \[asset_id, owner, balance]
-		Minted(AssetId, AccountId, Balance),
-		/// Some assets were burned. \[asset_id, owner, balance]
-		Burned(AssetId, AccountId, Balance),
-		/// Some assets were destroyed. \[asset_id, owner, balance\]
-		Destroyed(AssetId, AccountId, Balance),
-	}
+    pub enum Event<T> where
+        <T as frame_system::Trait>::AccountId,
+        <T as Trait>::Balance,
+        <T as Trait>::AssetId,
+    {
+        /// Some assets were issued. \[asset_id, owner, total_supply\]
+        Issued(AssetId, AccountId, Balance),
+        /// Some assets were transferred. \[asset_id, from, to, amount\]
+        Transferred(AssetId, AccountId, AccountId, Balance),
+        /// Some assets were minted. \[asset_id, owner, balance]
+        Minted(AssetId, AccountId, Balance),
+        /// Some assets were burned. \[asset_id, owner, balance]
+        Burned(AssetId, AccountId, Balance),
+        /// Some assets were destroyed. \[asset_id, owner, balance\]
+        Destroyed(AssetId, AccountId, Balance),
+    }
 }
 
 decl_error! {
-	pub enum Error for Module<T: Trait> {
-		/// Transfer amount should be non-zero
-		AmountZero,
-		/// Account balance must be greater than or equal to the transfer amount
-		BalanceLow,
-		/// Balance should be non-zero
-		BalanceZero,
-		/// Not the creator of the asset
-		NotTheCreator,
-		/// Not the approver for the account
-		NotApproved,
-		/// Created by System
-		CreatedBySystem,
-	}
+    pub enum Error for Module<T: Trait> {
+        /// Transfer amount should be non-zero
+        AmountZero,
+        /// Account balance must be greater than or equal to the transfer amount
+        BalanceLow,
+        /// Balance should be non-zero
+        BalanceZero,
+        /// Not the creator of the asset
+        NotTheCreator,
+        /// Not the approver for the account
+        NotApproved,
+        /// Created by System
+        CreatedBySystem,
+    }
 }
 
 decl_storage! {
-	trait Store for Module<T: Trait> as Assets {
-		/// The number of units of assets held by any given account.
-		Balances: map hasher(blake2_128_concat) (T::AssetId, T::AccountId) => T::Balance;
-		/// The next asset identifier up for grabs.
-		pub NextAssetId get(fn next_asset_id): T::AssetId;
-		/// The total unit supply of an asset.
-		///
-		/// TWOX-NOTE: `AssetId` is trusted, so this is safe.
-		TotalSupply: map hasher(twox_64_concat) T::AssetId => T::Balance;
-		Creator: map hasher(blake2_128_concat) T::AssetId => T::AccountId;
-	}
+    trait Store for Module<T: Trait> as Assets {
+        /// The number of units of assets held by any given account.
+        Balances: map hasher(blake2_128_concat) (T::AssetId, T::AccountId) => T::Balance;
+        /// The next asset identifier up for grabs.
+        pub NextAssetId get(fn next_asset_id): T::AssetId;
+        /// The total unit supply of an asset.
+        ///
+        /// TWOX-NOTE: `AssetId` is trusted, so this is safe.
+        TotalSupply: map hasher(twox_64_concat) T::AssetId => T::Balance;
+        Creator: map hasher(blake2_128_concat) T::AssetId => T::AccountId;
+    }
 }
 
 // The main implementation block for the module.
 impl<T: Trait> Module<T> {
-	// Public immutables
-	/// Get the asset `id` balance of `who`.
-	pub fn balance(id: T::AssetId, who: T::AccountId) -> T::Balance {
-		<Balances<T>>::get((id, who))
-	}
+    // Public immutables
+    /// Get the asset `id` balance of `who`.
+    pub fn balance(id: T::AssetId, who: T::AccountId) -> T::Balance {
+        <Balances<T>>::get((id, who))
+    }
 
-	/// Get the total supply of an asset `id`.
-	pub fn total_supply(id: T::AssetId) -> T::Balance {
-		<TotalSupply<T>>::get(id)
-	}
+    /// Get the total supply of an asset `id`.
+    pub fn total_supply(id: T::AssetId) -> T::Balance {
+        <TotalSupply<T>>::get(id)
+    }
 
-	pub fn mint_from_system(
-		id: &T::AssetId,
-		target: &T::AccountId,
-		amount: &T::Balance,
-	) -> dispatch::DispatchResult {
-		ensure!(!amount.is_zero(), Error::<T>::AmountZero);
-		Self::deposit_event(RawEvent::Minted(*id, target.clone(), *amount));
-		<Balances<T>>::mutate((*id, target), |balance| *balance += *amount);
-		Ok(())
-	}
+    pub fn mint_from_system(
+        id: &T::AssetId,
+        target: &T::AccountId,
+        amount: &T::Balance,
+    ) -> dispatch::DispatchResult {
+        ensure!(!amount.is_zero(), Error::<T>::AmountZero);
+        Self::deposit_event(RawEvent::Minted(*id, target.clone(), *amount));
+        <Balances<T>>::mutate((*id, target), |balance| *balance += *amount);
+        Ok(())
+    }
 
-	pub fn burn_from_system(
-		id: &T::AssetId,
-		target: &T::AccountId,
-		amount: &T::Balance,
-	) -> dispatch::DispatchResult {
-		ensure!(!amount.is_zero(), Error::<T>::AmountZero);
-		Self::deposit_event(RawEvent::Burned(*id, target.clone(), *amount));
-		<Balances<T>>::mutate((*id, target), |balance| *balance -= *amount);
-		Ok(())
-	}
+    pub fn burn_from_system(
+        id: &T::AssetId,
+        target: &T::AccountId,
+        amount: &T::Balance,
+    ) -> dispatch::DispatchResult {
+        ensure!(!amount.is_zero(), Error::<T>::AmountZero);
+        Self::deposit_event(RawEvent::Burned(*id, target.clone(), *amount));
+        <Balances<T>>::mutate((*id, target), |balance| *balance -= *amount);
+        Ok(())
+    }
 
-	pub fn issue_from_system(total: T::Balance) -> dispatch::DispatchResult {
-		let id = Self::next_asset_id();
-		<NextAssetId<T>>::mutate(|id| *id += One::one());
+    pub fn issue_from_system(total: T::Balance) -> dispatch::DispatchResult {
+        let id = Self::next_asset_id();
+        <NextAssetId<T>>::mutate(|id| *id += One::one());
 
-		<Balances<T>>::insert((id, &T::AccountId::default()), total);
-		<TotalSupply<T>>::insert(id, total);
-		<Creator<T>>::insert(id, &T::AccountId::default());
+        <Balances<T>>::insert((id, &T::AccountId::default()), total);
+        <TotalSupply<T>>::insert(id, total);
+        <Creator<T>>::insert(id, &T::AccountId::default());
 
-		Self::deposit_event(RawEvent::Issued(id, T::AccountId::default(), total));
-		Ok(())
-	}
+        Self::deposit_event(RawEvent::Issued(id, T::AccountId::default(), total));
+        Ok(())
+    }
 }

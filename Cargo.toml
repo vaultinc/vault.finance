@@ -3,7 +3,12 @@ panic = 'unwind'
 
 [workspace]
 members = [
-    'node',
-    'pallets/market',
+	"node/bench",
+	"node/browser-testing",
+	"node/cli",
+	"node/executor",
+	"node/primitives",
+	"node/rpc-client",
+	"node/rpc",
     'runtime',
 ]

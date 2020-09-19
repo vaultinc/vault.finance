@@ -1,0 +1,35 @@
+[package]
+name = "node-rpc"
+version = "2.0.0-rc6"
+authors = ["Parity Technologies <admin@parity.io>"]
+edition = "2018"
+license = "Apache-2.0"
+homepage = "https://substrate.dev"
+repository = "https://github.com/paritytech/substrate/"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+jsonrpc-core = "14.2.0"
+node-primitives = { version = "2.0.0-rc6", path = "../primitives" }
+node-runtime = { version = "2.0.0-rc6", path = "../../runtime" }
+pallet-contracts-rpc = { version = "0.8.0-rc6", git = 'https://github.com/paritytech/substrate.git' }
+pallet-transaction-payment-rpc = { version = "2.0.0-rc6", git = 'https://github.com/paritytech/substrate.git' }
+sc-client-api = { version = "2.0.0-rc6", git = 'https://github.com/paritytech/substrate.git' }
+sc-consensus-babe = { version = "0.8.0-rc6", git = 'https://github.com/paritytech/substrate.git' }
+sc-consensus-babe-rpc = { version = "0.8.0-rc6", git = 'https://github.com/paritytech/substrate.git' }
+sc-consensus-epochs = { version = "0.8.0-rc6", git = 'https://github.com/paritytech/substrate.git' }
+sc-finality-grandpa = { version = "0.8.0-rc6", git = 'https://github.com/paritytech/substrate.git' }
+sc-finality-grandpa-rpc = { version = "0.8.0-rc6", git = 'https://github.com/paritytech/substrate.git' }
+sc-keystore = { version = "2.0.0-rc6", git = 'https://github.com/paritytech/substrate.git' }
+sc-rpc-api = { version = "0.8.0-rc6", git = 'https://github.com/paritytech/substrate.git' }
+sc-rpc = { version = "2.0.0-rc6", git = 'https://github.com/paritytech/substrate.git' }
+sp-api = { version = "2.0.0-rc6", git = 'https://github.com/paritytech/substrate.git' }
+sp-block-builder = { version = "2.0.0-rc6", git = 'https://github.com/paritytech/substrate.git' }
+sp-blockchain = { version = "2.0.0-rc6", git = 'https://github.com/paritytech/substrate.git'}
+sp-consensus = { version = "0.8.0-rc6", git = 'https://github.com/paritytech/substrate.git' }
+sp-consensus-babe = { version = "0.8.0-rc6", git = 'https://github.com/paritytech/substrate.git' }
+sp-runtime = { version = "2.0.0-rc6", git = 'https://github.com/paritytech/substrate.git' }
+sp-transaction-pool = { version = "2.0.0-rc6", git = 'https://github.com/paritytech/substrate.git' }
+substrate-frame-rpc-system = { version = "2.0.0-rc6", git = 'https://github.com/paritytech/substrate.git' }
