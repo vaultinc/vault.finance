@@ -25,7 +25,7 @@ is-it-maintained-issue-resolution = { repository = "paritytech/substrate" }
 is-it-maintained-open-issues = { repository = "paritytech/substrate" }
 
 [[bin]]
-name = "subswap"
+name = "substrate"
 path = "bin/main.rs"
 required-features = ["cli"]
 
