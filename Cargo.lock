@@ -228,6 +228,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "assert_approx_eq"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c07dab4369547dbe5114677b33fbbf724971019f3818172d59a97a61c774ffd"
+
+[[package]]
 name = "async-channel"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3658,9 +3664,11 @@ dependencies = [
 name = "pallet-juggernaut"
 version = "2.0.0-rc6"
 dependencies = [
+ "assert_approx_eq",
  "frame-support",
  "frame-system",
  "parity-scale-codec",
+ "rand 0.7.3",
  "sp-core",
  "sp-io",
  "sp-runtime",
