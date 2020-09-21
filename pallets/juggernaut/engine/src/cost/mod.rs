@@ -11,6 +11,7 @@ pub enum CostFunctions {
 }
 
 /// Trait of cost functions
+#[typetag::serde]
 pub trait CostFunction {
     // calculates the value of cost function
     fn calc(&self, prediction: &Matrix, target: &Matrix) -> f64;

@@ -5,7 +5,9 @@ use crate::{
     cost::CostFunctions,
 };
 use std::f64;
+use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize)]
 pub struct CrossEntropy;
 
 impl CrossEntropy {
@@ -14,6 +16,7 @@ impl CrossEntropy {
     }
 }
 
+#[typetag::serde(name ="CrossEntropy")]
 impl CostFunction for CrossEntropy {
     fn name(&self) -> CostFunctions {
         CostFunctions::CrossEntropy
@@ -66,7 +69,7 @@ impl CostFunction for CrossEntropy {
 #[cfg(test)]
 mod tests {
     use crate::cost::CostFunction;
-    use crate::CrossEntropy;
+    use super::CrossEntropy;
     use crate::matrix::Matrix;
     use crate::matrix::MatrixTrait;
     use assert_approx_eq::assert_approx_eq;

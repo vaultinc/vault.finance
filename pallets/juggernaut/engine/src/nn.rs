@@ -10,15 +10,52 @@ use crate::{
 };
 use rand::seq::SliceRandom;
 use rand;
-use frame_support::codec::{Encode,Decode};
+
+use serde::{Deserialize, Serialize};
 
 /// Represents a Neural Network with layers, inputs and outputs
+#[derive(Serialize, Deserialize)]
 pub struct NeuralNetwork {
     layers: Vec<NeuralLayer>,
     cost_function: Box<dyn CostFunction>,
     shuffle_data: bool,
+}
+
+pub struct BlackBox {
     on_error_fn: Option<Box<dyn Fn(f64)>>,
     on_epoch_fn: Option<Box<dyn Fn(&NeuralNetwork)>>,
+}
+
+impl BlackBox{
+    fn new()-> Self{
+        BlackBox{
+            on_epoch_fn: None,
+            on_error_fn: None
+        }
+    } 
+    fn set_on_error<F>(&mut self,func: F)
+    where F: 'static +Fn(f64){
+        self.on_error_fn=Some(Box::new(func));
+    }
+    fn set_on_epoch<F>(&mut self,func: F)
+    where F: 'static +Fn(&NeuralNetwork){
+        self.on_epoch_fn=Some(Box::new(func));
+    }
+
+    fn emit_on_error(&self,err: f64) {
+        match self.on_error_fn {
+            Some(ref err_fn) => err_fn(err),
+            None => (),
+        }
+    }
+
+    /// To emit the `on_epoch` callback
+    fn emit_on_epoch(&self, network: &NeuralNetwork) {
+        match self.on_epoch_fn {
+            Some(ref epoch_fn) => epoch_fn(&network),
+            None => (),
+        }
+    }
 }
 
 impl NeuralNetwork {
@@ -27,8 +64,6 @@ impl NeuralNetwork {
             layers: vec![],
             cost_function: Box::new(SquaredError::new()),
             shuffle_data: true,
-            on_error_fn: None,
-            on_epoch_fn: None,
         }
     }
 
@@ -45,61 +80,8 @@ impl NeuralNetwork {
     {
         self.cost_function = Box::new(cost_function);
     }
+   
 
-    /// To add a callback function and receive the errors of the network during training process
-    /// Please note that there is another function that basically calcualtes the error value
-    pub fn on_error<FN>(&mut self, callback_fn: FN)
-    where
-        FN: 'static + Fn(f64),
-    {
-        self.on_error_fn = Some(Box::new(callback_fn));
-    }
-
-    /// To add a callback function to get called after each epoch
-    pub fn on_epoch<FN>(&mut self, callback_fn: FN)
-    where
-        FN: 'static + Fn(&NeuralNetwork),
-    {
-        self.on_epoch_fn = Some(Box::new(callback_fn));
-    }
-
-    /// To emit the `on_error` callback
-    fn emit_on_error(&self, err: f64) {
-        match self.on_error_fn {
-            Some(ref err_fn) => err_fn(err),
-            None => (),
-        }
-    }
-
-    /// To emit the `on_epoch` callback
-    fn emit_on_epoch(&self) {
-        match self.on_epoch_fn {
-            Some(ref epoch_fn) => epoch_fn(&self),
-            None => (),
-        }
-    }
-
-    /// To add a new layer to the network
-    ///
-    /// Example:
-    ///
-    /// ```
-    /// # #[macro_use] extern crate juggernaut;
-    /// # fn main() {
-    /// use juggernaut::sample::Sample;
-    /// use juggernaut::nl::NeuralLayer;
-    /// use juggernaut::nn::NeuralNetwork;
-    /// use juggernaut::activation::Activation;
-    /// use juggernaut::activation::Sigmoid;
-    ///
-    /// let mut test = NeuralNetwork::new();
-    ///
-    /// // 1st layer = 4 neurons - 2 inputs
-    /// let nl1 = NeuralLayer::new(4, 2, Sigmoid::new());
-    ///
-    /// test.add_layer(nl1);
-    /// # }
-    /// ```
     pub fn add_layer(&mut self, layer: NeuralLayer) {
         if self.layers.len() > 0 {
             let prev_layer_neurons = self.layers[self.layers.len() - 1].neurons();
@@ -194,7 +176,7 @@ impl NeuralNetwork {
 
     /// To train the network. It calls the forward pass and updates the weights using
     /// backpropagation
-    pub fn train(&mut self, mut samples: Vec<Sample>, epochs: i32, learning_rate: f64) {
+    pub fn train(&mut self, mut samples: Vec<Sample>, epochs: i32, learning_rate: f64, bl: Option<BlackBox>) {
         for _ in 0..epochs {
             let samples = samples.as_mut_slice();
             let mut rng = rand::thread_rng();
@@ -295,12 +277,14 @@ impl NeuralNetwork {
                 }
             }
 
-            self.emit_on_error(
-                error_value.iter().fold(0f64, |n, sum| sum + n) / samples.len() as f64,
-            );
+            if let Some(ref blackbox) = bl{
+                blackbox.emit_on_error(
+                    error_value.iter().fold(0f64, |n, sum| sum + n) / samples.len() as f64,
+                );
+                blackbox.emit_on_epoch(&self);
+            }
 
-            // call on_epoch callback
-            self.emit_on_epoch();
+           
         }
     }
 }
@@ -315,6 +299,7 @@ mod tests {
     use crate::nn::NeuralNetwork;
     use crate::matrix::MatrixTrait;
     use crate::cost::cross_entropy::CrossEntropy;
+    use crate::nn::BlackBox;
 
     #[test]
     fn get_layers_test() {
@@ -374,7 +359,7 @@ mod tests {
         // 1st layer = 1 neurons - 2 inputs
         test.add_layer(NeuralLayer::new(1, 2, sig_activation));
 
-        test.train(dataset, 10, 0.1f64);
+        test.train(dataset, 10, 0.1f64,None);
     }
 
     #[test]
@@ -396,7 +381,7 @@ mod tests {
 
         let forward = test.forward(&dataset[1]);
 
-        test.train(dataset, 100, 0.1f64);
+        test.train(dataset, 100, 0.1f64,None);
 
         assert_eq!(forward.len(), 2);
     }
@@ -420,7 +405,7 @@ mod tests {
         // 2nd layer = 1 neuron - 2 inputs
         test.add_layer(NeuralLayer::new(1, 2, sig_activation));
 
-        test.train(dataset, 5, 0.1f64);
+        test.train(dataset, 5, 0.1f64,None);
 
         let think = test.evaluate(&Sample::predict(vec![1f64, 0f64, 1f64]));
 
@@ -438,9 +423,8 @@ mod tests {
         ];
 
         let mut test = NeuralNetwork::new();
-
-        // error should be more than 0
-        test.on_error(|err| {
+        let mut bl = BlackBox::new();
+        bl.set_on_error(|err| {
             assert!(err > 0f64);
         });
 
@@ -451,7 +435,7 @@ mod tests {
         // 2nd layer = 1 neuron - 2 inputs
         test.add_layer(NeuralLayer::new(1, 2, sig_activation));
 
-        test.train(dataset, 5, 0.1f64);
+        test.train(dataset, 5, 0.1f64,Some(bl));
     }
 
     #[test]
@@ -464,10 +448,8 @@ mod tests {
         ];
 
         let mut test = NeuralNetwork::new();
-
-        // TODO (afshinm): this test is not complete.
-        // it should count the number of calls of the closure as well
-        test.on_epoch(|this| {
+        let mut bl = BlackBox::new();
+        bl.set_on_epoch(|this| {
             assert_eq!(3, this.layers[0].weights().cols());
             assert_eq!(2, this.layers[0].weights().rows());
 
@@ -482,7 +464,7 @@ mod tests {
         // 2nd layer = 1 neuron - 2 inputs
         test.add_layer(NeuralLayer::new(1, 2, sig_activation));
 
-        test.train(dataset, 5, 0.1f64);
+        test.train(dataset, 5, 0.1f64,Some(bl));
     }
 
     #[test]
@@ -501,7 +483,7 @@ mod tests {
         // 2nd layer = 1 neuron - 2 inputs
         test.add_layer(NeuralLayer::new(1, 2, HyperbolicTangent::new()));
 
-        test.train(dataset, 5, 0.1f64);
+        test.train(dataset, 5, 0.1f64,None);
 
         let think = test.evaluate(&Sample::predict(vec![1f64, 0f64, 1f64]));
 
@@ -528,7 +510,7 @@ mod tests {
         // 3rd layer = 1 neuron - 4 inputs
         test.add_layer(NeuralLayer::new(1, 4, Sigmoid::new()));
 
-        test.train(dataset, 1, 0.1f64);
+        test.train(dataset, 1, 0.1f64,None);
 
         let think = test.evaluate(&Sample::predict(vec![1f64, 0f64, 1f64]));
 
@@ -553,7 +535,7 @@ mod tests {
 
         test.set_cost_function(CrossEntropy);
 
-        test.train(dataset, 5, 0.1f64);
+        test.train(dataset, 5, 0.1f64,None);
 
         let think = test.evaluate(&Sample::predict(vec![1f64, 0f64, 1f64]));
 
@@ -578,7 +560,7 @@ mod tests {
         // 2nd layer = 1 neuron - 3 inputs
         test.add_layer(NeuralLayer::new(2, 3, SoftMax::new()));
 
-        test.train(dataset, 5, 0.01f64);
+        test.train(dataset, 5, 0.01f64,None);
     }
 
     #[test]
@@ -597,6 +579,6 @@ mod tests {
         // 2nd layer = 1 neuron - 3 inputs
         test.add_layer(NeuralLayer::new(2, 3, SoftMax::new()));
 
-        test.train(dataset, 5, 0.01f64);
+        test.train(dataset, 5, 0.01f64,None);
     }
 }

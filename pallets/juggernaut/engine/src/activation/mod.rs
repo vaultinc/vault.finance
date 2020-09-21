@@ -15,6 +15,7 @@ pub use self::rectifiedlinearunit::RectifiedLinearUnit;
 pub use self::leakyrectifiedlinearunit::LeakyRectifiedLinearUnit;
 
 /// Activation trait
+#[typetag::serde]
 pub trait Activation {
     // the function itself
     fn calc(&self, x: Vec<f64>) -> Vec<f64>;

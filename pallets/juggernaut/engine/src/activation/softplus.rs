@@ -1,8 +1,8 @@
 use std::f64;
 use crate::activation::Activation;
-use frame_support::codec::{Encode, Decode};
+use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone,Encode,Decode,Default)]
+#[derive(Serialize, Deserialize,Copy,Clone)]
 pub struct SoftPlus;
 
 impl SoftPlus {
@@ -11,6 +11,7 @@ impl SoftPlus {
     }
 }
 
+#[typetag::serde(name="SoftPlus")]
 impl Activation for SoftPlus {
     /// Calculates the SoftPlus of input `x`
     fn calc(&self, x: Vec<f64>) -> Vec<f64> {

@@ -13,11 +13,5 @@ fn it_works_for_default_value() {
 
 #[test]
 fn correct_error_for_none_value() {
-	new_test_ext().execute_with(|| {
-		// Ensure the expected error is thrown when no value is present.
-		assert_noop!(
-			TemplateModule::cause_error(Origin::signed(1)),
-			Error::<Test>::NoneValue
-		);
-	});
+	
 }

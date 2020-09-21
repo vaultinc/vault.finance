@@ -4,7 +4,10 @@ use crate::{
     activation::Activation,
 };
 
+use serde::{Deserialize, Serialize};
+
 /// Represents a neural layer with its weights
+#[derive(Serialize, Deserialize)]
 pub struct NeuralLayer {
     pub activation: Box<dyn Activation>,
     inputs: usize,

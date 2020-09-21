@@ -1,7 +1,7 @@
 use crate::activation::Activation;
-use frame_support::codec::{Encode, Decode};
+use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone,Encode,Decode,Default)]
+#[derive(Serialize, Deserialize,Copy,Clone)]
 pub struct SoftMax;
 
 impl SoftMax {
@@ -10,6 +10,7 @@ impl SoftMax {
     }
 }
 
+#[typetag::serde(name="SoftMax")]
 impl Activation for SoftMax {
     /// Calculates the SoftMax of input `x`
     fn calc(&self, x: Vec<f64>) -> Vec<f64> {

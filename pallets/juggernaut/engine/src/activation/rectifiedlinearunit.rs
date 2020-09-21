@@ -1,8 +1,8 @@
 use crate::activation::Activation;
 use frame_support::codec::{Encode, Decode};
+use serde::{Deserialize, Serialize};
 
-
-#[derive(Copy, Clone,Encode,Decode,Default)]
+#[derive(Serialize, Deserialize,Copy,Clone)]
 pub struct RectifiedLinearUnit;
 
 impl RectifiedLinearUnit {
@@ -11,6 +11,7 @@ impl RectifiedLinearUnit {
     }
 }
 
+#[typetag::serde(name= "RectifiedLinearUnit")]
 impl Activation for RectifiedLinearUnit {
     /// Calculates the RectifiedLinearUnit of input `x`
     fn calc(&self, x: Vec<f64>) -> Vec<f64> {

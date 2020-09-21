@@ -4,8 +4,9 @@ use crate::{
     matrix::MatrixTrait,
     cost::CostFunctions,
 };
+use serde::{Deserialize, Serialize};
 
-
+#[derive(Serialize, Deserialize)]
 pub struct SquaredError;
 
 impl SquaredError {
@@ -14,6 +15,7 @@ impl SquaredError {
     }
 }
 
+#[typetag::serde(name ="SquaredError")]
 impl CostFunction for SquaredError {
     fn name(&self) -> CostFunctions {
         CostFunctions::SquaredError

@@ -1,7 +1,8 @@
 use rand::prelude::*;
 use std::sync::Mutex;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Deserialize,Serialize,Debug, Clone, PartialEq)]
 pub struct Matrix(Vec<Vec<f64>>);
 
 pub trait MatrixTrait {
@@ -22,19 +23,6 @@ pub trait MatrixTrait {
 }
 
 impl MatrixTrait for Matrix {
-    /// Returns a vector with `m` rows and `n` columns
-    ///
-    /// Example:
-    ///
-    /// ```
-    /// # #[macro_use] extern crate juggernaut;
-    /// # fn main() {
-    /// use juggernaut::matrix::Matrix;
-    /// use juggernaut::matrix::MatrixTrait;
-    ///
-    /// let matrix = Matrix::generate(2, 2, &|_,_| 2f64);
-    /// # }
-    /// ```
     fn generate<F>(m: usize, n: usize, f: F) -> Matrix 
     where F: Fn(usize, usize) -> f64{
         let mut mtx: Vec<Vec<f64>> = Vec::with_capacity(m);

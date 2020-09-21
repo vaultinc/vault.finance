@@ -1,24 +1,24 @@
 use crate::activation::Activation;
-use frame_support::codec::{Encode, Decode};
-use sp_arithmetic::FixedI64;
+use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone,Encode,Decode,Default)]
+#[derive(Serialize, Deserialize,Copy,Clone)]
 pub struct LeakyRectifiedLinearUnit {
-    alpha_gradient: FixedI64,
+    alpha_gradient: f64,
 }
+
 
 impl LeakyRectifiedLinearUnit {
     pub fn new(alpha: f64) -> LeakyRectifiedLinearUnit {
-        return LeakyRectifiedLinearUnit { alpha_gradient: FixedI64::from_fraction(alpha) };
+        return LeakyRectifiedLinearUnit { alpha_gradient: alpha };
     }
 }
-
+#[typetag::serde(name="LeakyRectifiedLinearUnit")]
 impl Activation for LeakyRectifiedLinearUnit {
     /// Calculates the LeakyRectifiedLinearUnit of input `x`
     fn calc(&self, x: Vec<f64>) -> Vec<f64> {
         x.iter()
             .map(|&n| if n <= 0f64 {
-                self.alpha_gradient.to_fraction() * n
+                self.alpha_gradient * n
             } else {
                 n
             })
@@ -28,7 +28,7 @@ impl Activation for LeakyRectifiedLinearUnit {
     /// Calculates the Derivative LeakyRectifiedLinearUnit of input `x`
     fn derivative(&self, x: Vec<f64>) -> Vec<f64> {
         x.iter()
-            .map(|&n| if n <= 0f64 { self.alpha_gradient.to_fraction() } else { n })
+            .map(|&n| if n <= 0f64 { self.alpha_gradient } else { n })
             .collect::<Vec<_>>()
     }
 }
