@@ -70,6 +70,13 @@ use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 use static_assertions::const_assert;
 
+//local pallets
+pub use pallet_juggernaut;
+
+impl pallet_juggernaut::Trait for Runtime {
+	type Event = Event;
+}
+
 #[cfg(any(feature = "std", test))]
 pub use frame_system::Call as SystemCall;
 #[cfg(any(feature = "std", test))]
@@ -940,7 +947,8 @@ construct_runtime!(
         Vesting: pallet_vesting::{Module, Call, Storage, Event<T>, Config<T>},
         Scheduler: pallet_scheduler::{Module, Call, Storage, Event<T>},
         Proxy: pallet_proxy::{Module, Call, Storage, Event<T>},
-        Multisig: pallet_multisig::{Module, Call, Storage, Event<T>},
+		Multisig: pallet_multisig::{Module, Call, Storage, Event<T>},
+		JuggerNaut: pallet_juggernaut::{Module, Call, Storage, Event<T>},
     }
 );
 
