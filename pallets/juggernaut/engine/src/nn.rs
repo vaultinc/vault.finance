@@ -287,6 +287,15 @@ impl NeuralNetwork {
            
         }
     }
+    pub fn get_neural_from_str(input: String) -> Result<NeuralNetwork,String>{
+        serde_json::from_str(input.as_str()).map_err(|e| format!("parsing: {}",e))?
+    }
+}
+
+impl ToString for NeuralNetwork{
+    fn to_string(&self)->String{
+        serde_json::to_string(&self).unwrap()
+    }
 }
 
 #[cfg(test)]
@@ -300,6 +309,23 @@ mod tests {
     use crate::matrix::MatrixTrait;
     use crate::cost::cross_entropy::CrossEntropy;
     use crate::nn::BlackBox;
+
+
+    #[test]
+    fn serde_test(){
+        let mut test = NeuralNetwork::new();
+
+        let layers = vec![NeuralLayer::new(1, 2, Sigmoid::new())];
+
+        for layer in layers {
+            test.add_layer(layer);
+        }
+
+        let s = serde_json::to_string(&test).unwrap();
+        println!("{}",s);
+        let d: NeuralNetwork = serde_json::from_str(s.as_str()).unwrap();
+
+    }
 
     #[test]
     fn get_layers_test() {

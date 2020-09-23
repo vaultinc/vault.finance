@@ -2,7 +2,7 @@ use rand::prelude::*;
 use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize,Serialize,Debug, Clone, PartialEq)]
+#[derive(Deserialize,Serialize,Debug, Clone,PartialEq)]
 pub struct Matrix(Vec<Vec<f64>>);
 
 pub trait MatrixTrait {

@@ -1,5 +1,6 @@
-/// A sample of the given dataset
-#[derive(Debug)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize,Debug,PartialEq)]
 pub struct Sample {
     pub inputs: Vec<f64>,
     pub outputs: Option<Vec<f64>>,
@@ -30,12 +31,22 @@ impl Sample {
             &None => 0,
         }
     }
+    pub fn to_string(&self) ->String{
+        serde_json::to_string(&self).unwrap()
+    }
 }
 
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn json_test(){
+        let sample = Sample::new(vec![1f64, 0f64], vec![0f64]);
+        let st = sample.to_string();
+        assert_eq!(sample,serde_json::from_str(st.as_str()).unwrap());
+    }
 
     #[test]
     fn inputs_count() {
