@@ -169,9 +169,7 @@ impl NeuralNetwork {
     /// This function calculates the error rate of network during training and
     /// calls the `on_error_fn` if it is available
     fn error(&self, prediction: &Matrix, target: &Matrix) -> f64 {
-        let err = self.cost_function.calc(prediction, target);
-
-        err
+        self.cost_function.calc(prediction, target)
     }
 
     /// To train the network. It calls the forward pass and updates the weights using

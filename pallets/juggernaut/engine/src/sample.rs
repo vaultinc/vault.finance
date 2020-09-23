@@ -34,6 +34,9 @@ impl Sample {
     pub fn to_string(&self) ->String{
         serde_json::to_string(&self).unwrap()
     }
+    pub fn from_string(target: String)-> Result<Self,String>{
+        serde_json::from_str(target.as_str()).map_err(|e| format!("sample err:{}",e))
+    }
 }
 
 

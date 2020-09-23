@@ -20,8 +20,9 @@ use engine::activation::{
 	SoftMax,
 	SoftPlus	
 };
-
+use frame_support::sp_runtime::FixedI64;
 use engine::sample::Sample;
+use engine::matrix::Matrix;
 
 
 
@@ -32,10 +33,7 @@ mod mock;
 mod tests;
 
 
-
-/// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Trait: frame_system::Trait {
-	/// Because this pallet emits events, it depends on the runtime's definition of an event.
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
 }
 
@@ -62,6 +60,9 @@ impl NeuralStruct{
 		}
 	} 
 	pub fn add_layers(&mut self,layer: NeuralLayer){
+		if self.neural_network.is_none(){
+			self.neural_network=Some(NeuralNetwork::new().to_string());
+		}
 		if let Ok(mut net) = self.get_model(){
 			net.add_layer(layer);
 			self.neural_network=Some(net.to_string());
@@ -69,6 +70,15 @@ impl NeuralStruct{
 	}
 	pub fn get_model_string(&self)->String{
 		self.neural_network.as_ref().unwrap_or(&"".to_owned()).to_string()
+	}
+	pub fn train(&mut self,samples: Vec<Sample> ,epoch: i32, learning_rate: f64){
+		let mut nn =self.get_model().unwrap();
+		nn.train(samples,epoch,learning_rate,None);
+		self.neural_network=Some(nn.to_string());
+	}
+	pub fn run(&self, samples: Sample) -> Matrix{
+		let nn =self.get_model().unwrap();
+		nn.evaluate(&samples)
 	}
 }
 
@@ -81,10 +91,12 @@ decl_storage! {
 
 decl_event!(
 	pub enum Event<T> where AccountId = <T as frame_system::Trait>::AccountId {
-		MakeNewModel(NeuralKey<AccountId>,String),
+		MakeNewModel(NeuralKey<AccountId>),
 		AddLayer(NeuralKey<AccountId>,String),
 		UpdateModel(NeuralKey<AccountId>,String),
 		AddDataSet(NeuralKey<AccountId>),
+		TrainComplete(NeuralKey<AccountId>),
+		RunResult(NeuralKey<AccountId>,String),
 	}
 );
 
@@ -92,8 +104,10 @@ decl_event!(
 decl_error! {
 	pub enum Error for Module<T: Trait> {
 		UnableNewNueral,
-		NoNueral,
-		WrongLayerType 
+		NoModel,
+		WrongLayerType,
+		ModelParsingError,
+		NoData
 	}
 }
 
@@ -105,43 +119,49 @@ decl_module! {
 		// Events must be initialized if they are used by the pallet.
 		fn deposit_event() = default;
 		
+		// generate new model
 		#[weight = 1_100_000_000]
 		pub fn make_new_neural(origin, name: String) -> dispatch::DispatchResult {
 			let who = ensure_signed(origin)?;
 			
-			// make new model and 
 			let ns = NeuralStruct::new(name.clone()); 
-			Self::deposit_event(RawEvent::MakeNewModel((who.clone(),name.clone()),ns.get_model_string()));
+			Self::deposit_event(RawEvent::MakeNewModel((who.clone(),name.clone())));
 			<NeuralContainer<T>>::insert((who.clone(),name.clone()), ns);
 			Ok(())
 		}
 		
+		//add layer to model
 		#[weight = 2_500_000_000]
 		pub fn add_layer(origin,name: String,size: (u32,u32),layer_type: String, extra_parameter: String) -> dispatch::DispatchResult {
 			let who = ensure_signed(origin)?;
 			let (in_s,out_s) = (size.0 as usize, size.1 as usize);
 
-			let mut ns = <NeuralContainer<T>>::get((who.clone(),name.clone()));
+			ensure!(<NeuralContainer<T>>::contains_key(&(who.clone(),name.clone())),Error::<T>::NoModel);
+
+			let mut ns=<NeuralContainer<T>>::get((who.clone(),name.clone()));
 
 
 			let layer = match layer_type.as_str(){
 				"HyperBolicTangent" =>{
-					Some(NeuralLayer::new(in_s,out_s,HyperbolicTangent::new()))
+					Some(NeuralLayer::new(out_s,in_s,HyperbolicTangent::new()))
 				},
 				"Sigmoid" =>{
-					Some(NeuralLayer::new(in_s,out_s,Sigmoid::new()))
+					Some(NeuralLayer::new(out_s,in_s,Sigmoid::new()))
 				},
+				"RectifiedLinear" =>{
+					Some(NeuralLayer::new(out_s,in_s,RectifiedLinearUnit::new()))
+				}
 				"LeackyLelu" =>{
-					Some(NeuralLayer::new(in_s,out_s,LeakyRectifiedLinearUnit::new(extra_parameter.parse().unwrap())))
+					Some(NeuralLayer::new(out_s,in_s,LeakyRectifiedLinearUnit::new(extra_parameter.parse().unwrap())))
 				},
 				"SoftMax" =>{
-					Some(NeuralLayer::new(in_s,out_s,SoftMax::new()))
+					Some(NeuralLayer::new(out_s,in_s,SoftMax::new()))
 				},
 				"SoftPlus" =>{
-					Some(NeuralLayer::new(in_s,out_s,SoftPlus::new()))
+					Some(NeuralLayer::new(out_s,in_s,SoftPlus::new()))
 				},
 				"Identity" =>{
-					Some(NeuralLayer::new(in_s,out_s,Identity::new()))
+					Some(NeuralLayer::new(out_s,in_s,Identity::new()))
 				},
 				_ =>{
 					None
@@ -156,11 +176,12 @@ decl_module! {
 			Ok(())
 		}
 
+		//add data_set for model
 		#[weight = 2_500_000_000]
 		pub fn add_data_set(origin,name: String,size: (u32,u32), csv: String ) -> dispatch::DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			ensure!(<NeuralContainer<T>>::contains_key(&(who.clone(),name.clone())),Error::<T>::NoNueral);
+			ensure!(<NeuralContainer<T>>::contains_key(&(who.clone(),name.clone())),Error::<T>::NoModel);
 
 			let mut reader = csv::Reader::from_reader(csv.as_bytes());
 			let (in_s,out_s) = (size.0 as usize, size.1 as usize);
@@ -177,6 +198,54 @@ decl_module! {
 			<DataContainer<T>>::insert((who.clone(),name.clone()), samples);
 			
 			Self::deposit_event(RawEvent::AddDataSet((who.clone(),name.clone())));
+			Ok(())
+		}
+
+		//train model
+		#[weight = 2_500_000_000]
+		pub fn train(origin,name: String,epoch: i32, learning_rate: FixedI64) -> dispatch::DispatchResult {
+			let who = ensure_signed(origin)?;
+
+			ensure!(<NeuralContainer<T>>::contains_key(&(who.clone(),name.clone())),Error::<T>::NoModel);
+
+			let mut ns=<NeuralContainer<T>>::get((who.clone(),name.clone()));
+			ensure!(ns.get_model().is_ok(),Error::<T>::ModelParsingError);
+
+			ensure!(<DataContainer<T>>::contains_key(&(who.clone(),name.clone())),Error::<T>::NoData);
+			let datas = <DataContainer<T>>::get((who.clone(),name.clone())); 
+
+			let mut samples = Vec::new();
+			for raw_string in datas.iter(){
+				match Sample::from_string(raw_string.clone()){
+					Ok(s) => {
+						samples.push(s)
+					},
+					Err(_) =>{
+						
+					}
+				}
+			}
+			ns.train(samples,epoch,learning_rate.to_fraction());
+			Self::deposit_event(RawEvent::TrainComplete((who.clone(),name.clone())));
+			<NeuralContainer<T>>::mutate((who.clone(),name.clone()),move |i|{
+				*i=ns
+			});
+			Ok(())
+		}
+
+		//run model
+		#[weight = 2_500_000_000]
+		pub fn run(origin,name: String, csv: String) -> dispatch::DispatchResult {
+			let who = ensure_signed(origin)?;
+
+			ensure!(<NeuralContainer<T>>::contains_key(&(who.clone(),name.clone())),Error::<T>::NoModel);
+			let ns=<NeuralContainer<T>>::get((who.clone(),name.clone()));
+
+			ensure!(ns.get_model().is_ok(),Error::<T>::ModelParsingError);
+			let sample: Vec<f64>= csv.split(',').map(|s| s.parse().unwrap()).collect();
+			let result=ns.run(Sample::predict(sample));
+			
+			Self::deposit_event(RawEvent::RunResult((who.clone(),name.clone()),result.to_string()));
 			Ok(())
 		}
 	}
